@@ -6,13 +6,13 @@
     "revisions": {
       "172": {
         "asb_date": "2026-06",
-        "default_r": "r5",
+        "default_r": "r6",
         "supported_r": [
-          "r5",
+          "r6",
           "none"
         ],
-        "commit": "f29170a39abfc698a96d7cfcab5a39a5c2088274",
-        "commit_date": "2026-07-23 10:37:18 +0100"
+        "commit": "e5bd51fda5b4a426109058d3606419285acac6d3",
+        "commit_date": "2026-08-07 03:26:45 -0700"
       },
       "176": {
         "asb_date": "lts",
