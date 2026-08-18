@@ -7,10 +7,10 @@ on:
       source_mirror:
         description: 'Kernel Source'
         required: true
-        default: 'midori'
+        default: 'release'
         type: choice
         options:
-          - midori
+          - release
           - google
       kernel_version:
         description: 'Kernel Version'
@@ -29,52 +29,36 @@ on:
         type: choice
         options:
           - all
-          - MidoriSU-KO
-          - MidoriSU-NX
-          - MidoriSU-OG
-          - MidoriSU-RE
-          - MidoriSU-XX
-      midorisu_ko_branch:
-        description: 'MidoriSU-KO Source'
+          - KowSU
+          - KernelSU-Next
+          - KernelSU-Official
+          - ReSukiSU
+          - KernelSU-XX
+      kowsu_branch:
+        description: 'KowSU Source'
         required: true
         default: 'KOWX712/KernelSU:master'
-        type: choice
-        options:
-          - 'KOWX712/KernelSU:master'
-          - 'midori01/KernelSU:kow'
-      midorisu_nx_branch:
-        description: 'MidoriSU-NX Source'
+        type: string
+      kernelsu_next_branch:
+        description: 'KernelSU-Next Source'
         required: true
         default: 'KernelSU-Next/KernelSU-Next:dev'
-        type: choice
-        options:
-          - 'KernelSU-Next/KernelSU-Next:dev'
-          - 'midori01/KernelSU:next'
-      midorisu_og_branch:
-        description: 'MidoriSU-OG Source'
+        type: string
+      kernelsu_official_branch:
+        description: 'KernelSU Official Source'
         required: true
         default: 'tiann/KernelSU:main'
-        type: choice
-        options:
-          - 'tiann/KernelSU:main'
-          - 'midori01/KernelSU:official'
-      midorisu_re_branch:
-        description: 'MidoriSU-RE Source'
+        type: string
+      resukisu_branch:
+        description: 'ReSukiSU Source'
         required: true
         default: 'ReSukiSU/ReSukiSU:main'
-        type: choice
-        options:
-          - 'ReSukiSU/ReSukiSU:main'
-          - 'midori01/KernelSU:resuki'
-      midorisu_xx_branch:
-        description: 'MidoriSU-XX Source'
+        type: string
+      kernelsu_xx_branch:
+        description: 'KernelSU-XX Source'
         required: true
         default: 'backslashxx/KernelSU:master'
-        type: choice
-        options:
-          - 'backslashxx/KernelSU:master'
-          - 'backslashxx/KernelSU:staging'
-          - 'midori01/KernelSU:xx'
+        type: string
       hook_mode:
         description: "Hook Mode"
         required: true
@@ -142,7 +126,7 @@ on:
       build_user:
         description: 'Spoof Build User'
         required: true
-        default: 'midori'
+        default: 'github-actions'
         type: string
       build_host:
         description: 'Spoof Build Host'
@@ -201,7 +185,7 @@ jobs:
           fi
           echo "kernel_versions=$kvs" >> $GITHUB_OUTPUT
 
-          SUFFIX="-midori"
+          SUFFIX="-ksu"
           [ "${{ inputs.enable_susfs }}" = "true" ] && SUFFIX="${SUFFIX}-susfs"
           [ "${{ inputs.use_droidspaces }}" = "true" ] && SUFFIX="${SUFFIX}-droidspaces"
           echo "kernel_localversion=${{ inputs.kernel_localversion || 'SUFFIX_PLACEHOLDER' }}" | sed "s/SUFFIX_PLACEHOLDER/$SUFFIX/" >> $GITHUB_OUTPUT
@@ -225,7 +209,6 @@ jobs:
 
           matrix='{"include":[]}'
           variant="${{ inputs.ksu_variant }}"
-          
           while read kv; do
             config=$(jq -c '.["'$kv'"]' "$config_file")
             android_version=$(echo "$config" | jq -r '.android_version')
@@ -284,19 +267,19 @@ jobs:
                 '{kernel_version:$kv,sub_level:$sub_level,android_version:$android_version,asb_date:$asb_date,r_version:$r_version,r_suffix:$r_suffix,clang_version:$clang_version,rust_version:$rust_version,mirror_tag:$mirror_tag,anykernel_branch:$anykernel_branch,source_ref:$source_ref,source_commit:$source_commit,source_commit_date:$source_commit_date}' >> /tmp/metadata.json
 
               add_variant() {
-                local v=$1 has_susfs=$2
+                local v=$1
                 local ds="false"
                 local sus="false"
                 [ "${{ inputs.use_droidspaces }}" = "true" ] && ds="true"
-                [ "$has_susfs" = "true" ] && [ "${{ inputs.enable_susfs }}" = "true" ] && sus="true"
+                [ "${{ inputs.enable_susfs }}" = "true" ] && sus="true"
                 matrix=$(echo "$matrix" | jq -c --arg kv "$kv" --arg sub_level "$sub_level" --arg variant "$v" --argjson ds "$ds" --argjson sus "$sus" '.include += [{"kernel_version":$kv,"sub_level":$sub_level,"variant":$variant,"droidspaces":$ds,"susfs":$sus}]')
               }
 
-              [[ "$variant" =~ ^(all|MidoriSU-KO)$ ]] && add_variant MidoriSU-KO true
-              [[ "$variant" =~ ^(all|MidoriSU-NX)$ ]] && add_variant MidoriSU-NX true
-              [[ "$variant" =~ ^(all|MidoriSU-OG)$ ]] && add_variant MidoriSU-OG true
-              [[ "$variant" =~ ^(all|MidoriSU-RE)$ ]] && add_variant MidoriSU-RE true
-              [[ "$variant" =~ ^(all|MidoriSU-XX)$ ]] && add_variant MidoriSU-XX true
+              [[ "$variant" =~ ^(all|KowSU)$ ]] && add_variant KowSU
+              [[ "$variant" =~ ^(all|KernelSU-Next)$ ]] && add_variant KernelSU-Next
+              [[ "$variant" =~ ^(all|KernelSU-Official)$ ]] && add_variant KernelSU-Official
+              [[ "$variant" =~ ^(all|ReSukiSU)$ ]] && add_variant ReSukiSU
+              [[ "$variant" =~ ^(all|KernelSU-XX)$ ]] && add_variant KernelSU-XX
             done
           done < /tmp/kvs.txt
 
@@ -336,11 +319,11 @@ jobs:
       build_timestamp: ${{ needs.setup.outputs.build_timestamp }}
       build_user: ${{ inputs.build_user }}
       build_host: ${{ inputs.build_host }}
-      midorisu_ko_branch: ${{ inputs.midorisu_ko_branch }}
-      midorisu_nx_branch: ${{ inputs.midorisu_nx_branch }}
-      midorisu_og_branch: ${{ inputs.midorisu_og_branch }}
-      midorisu_re_branch: ${{ inputs.midorisu_re_branch }}
-      midorisu_xx_branch: ${{ inputs.midorisu_xx_branch }}
+      kowsu_branch: ${{ inputs.kowsu_branch }}
+      kernelsu_next_branch: ${{ inputs.kernelsu_next_branch }}
+      kernelsu_official_branch: ${{ inputs.kernelsu_official_branch }}
+      resukisu_branch: ${{ inputs.resukisu_branch }}
+      kernelsu_xx_branch: ${{ inputs.kernelsu_xx_branch }}
       hook_mode: ${{ needs.setup.outputs.hook_mode_val }}
       ksu_debug: ${{ inputs.ksu_debug }}
 
@@ -438,15 +421,6 @@ jobs:
         run: |
           gh release download --repo sidex15/susfs4ksu-module --pattern "*.zip" --dir release_zips 2>/dev/null || true
 
-      - name: Download MidoriSU Manager APK
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release download --repo midori01/KernelSU --pattern "*.apk" --dir release_zips 2>/dev/null || true
-          apk=$(ls release_zips/*.apk 2>/dev/null | head -n 1)
-          echo "MIDORISU_APK=$(basename "$apk" 2>/dev/null)" >> $GITHUB_ENV
-          echo "KSUD_VERSION=$(echo "$apk" | grep -oP '\d+(?=-release\.apk$)' || echo "unknown")" >> $GITHUB_ENV
-
       - name: Read Commit Info
         id: ksu_info
         run: |
@@ -454,9 +428,9 @@ jobs:
           short_sha() { cut -c1-7 "$1"; }
           out() { echo "$1" >> $GITHUB_OUTPUT; }
           ksu_line() {
-            local tag=$1 repo=$2 file=$3
+            local tag=$1 key=$2 repo=$3 file=$4
             [ -f "$file" ] && [[ "$variant" =~ ^(all|$tag)$ ]] || return 0
-            out "${tag,,}=- **$tag**: [\`$(short_sha "$file")\`](https://github.com/$repo/commit/$(cat "$file")) \`$(cat "${file%_commit}_date")\`"
+            out "$key=- **$tag**: [\`$(short_sha "$file")\`](https://github.com/$repo/commit/$(cat "$file")) \`$(cat "${file%_commit}_date")\`"
           }
           rekernel_line() {
             local label=$1 file=$2
@@ -478,16 +452,13 @@ jobs:
             out "susfs_url=https://gitlab.com/simonpunk/susfs4ksu/-/commit/$sha"
             out "susfs_date=\`$(cat commit_info/susfs_date)\`"
           fi
-          if [ -f "commit_info/driver_version" ]; then
-            out "driver_version=$(cat commit_info/driver_version)"
-          fi
           rekernel_line "Re:Kernel" commit_info/rekernel_commit
           rekernel_x_line "Re:Kernel-X" commit_info/rekernel_x_commit
-          ksu_line MidoriSU-KO "$(cat commit_info/midorisu_ko_ksu_repo 2>/dev/null)" commit_info/midorisu_ko_ksu_commit
-          ksu_line MidoriSU-NX "$(cat commit_info/midorisu_nx_ksu_repo 2>/dev/null)" commit_info/midorisu_nx_ksu_commit
-          ksu_line MidoriSU-OG "$(cat commit_info/midorisu_og_ksu_repo 2>/dev/null)" commit_info/midorisu_og_ksu_commit
-          ksu_line MidoriSU-RE "$(cat commit_info/midorisu_re_ksu_repo 2>/dev/null)" commit_info/midorisu_re_ksu_commit
-          ksu_line MidoriSU-XX "$(cat commit_info/midorisu_xx_ksu_repo 2>/dev/null)" commit_info/midorisu_xx_ksu_commit
+          ksu_line KowSU kowsu "$(cat commit_info/kowsu_ksu_repo 2>/dev/null)" commit_info/kowsu_ksu_commit
+          ksu_line KernelSU-Next kernelsu_next "$(cat commit_info/kernelsu_next_ksu_repo 2>/dev/null)" commit_info/kernelsu_next_ksu_commit
+          ksu_line KernelSU-Official kernelsu_official "$(cat commit_info/kernelsu_official_ksu_repo 2>/dev/null)" commit_info/kernelsu_official_ksu_commit
+          ksu_line ReSukiSU resukisu "$(cat commit_info/resukisu_ksu_repo 2>/dev/null)" commit_info/resukisu_ksu_commit
+          ksu_line KernelSU-XX kernelsu_xx "$(cat commit_info/kernelsu_xx_ksu_repo 2>/dev/null)" commit_info/kernelsu_xx_ksu_commit
 
       - name: Publish Release
         uses: softprops/action-gh-release@v3
@@ -497,16 +468,15 @@ jobs:
           make_latest: ${{ matrix.kv == '6.12' || !contains(needs.setup.outputs.kernel_versions, ',') }}
           body: |
             ${{ env.KERNEL_SOURCE_INFO }}
-            ${{ steps.ksu_info.outputs.midorisu-ko }}
-            ${{ steps.ksu_info.outputs.midorisu-nx }}
-            ${{ steps.ksu_info.outputs.midorisu-og }}
-            ${{ steps.ksu_info.outputs.midorisu-re }}
-            ${{ steps.ksu_info.outputs.midorisu-xx }}
+            ${{ steps.ksu_info.outputs.kowsu }}
+            ${{ steps.ksu_info.outputs.kernelsu_next }}
+            ${{ steps.ksu_info.outputs.kernelsu_official }}
+            ${{ steps.ksu_info.outputs.resukisu }}
+            ${{ steps.ksu_info.outputs.kernelsu_xx }}
             ${{ steps.ksu_info.outputs.susfs_url && format('- **SUSFS4KSU**: [{0}]({1}) {2}', steps.ksu_info.outputs.susfs_commit, steps.ksu_info.outputs.susfs_url, steps.ksu_info.outputs.susfs_date) || '' }}
             ${{ steps.ksu_info.outputs.rekernel_line }}
             ${{ steps.ksu_info.outputs.rekernel_x_line }}
-            - **KSU Driver**: `${{ steps.ksu_info.outputs.driver_version || env.KSUD_VERSION }}`　**KSU Daemon (ksud)**: `${{ env.KSUD_VERSION }}`
-            - **Manager**: `${{ env.MIDORISU_APK }}`
+            - **Manager**: Use the manager provided by the selected KernelSU upstream
             - **Spoofed Uname**: `${{ matrix.kv }}.${{ env.UNAME_SUB }}${{ needs.setup.outputs.kernel_localversion }}`
             - **Spoofed Build Time**: `${{ needs.setup.outputs.build_timestamp }}`
             - **Spoofed Builder**: `${{ inputs.build_user }}@${{ inputs.build_host }}`
@@ -519,7 +489,6 @@ jobs:
             - **Compiler**: `clang-${{ env.CLANG_VERSION }}`${{ env.RUST_VERSION && format('　**Rust**: `{0}`', env.RUST_VERSION) || '' }}
           files: |
             release_zips/*.zip
-            release_zips/*.apk
           prerelease: ${{ inputs.release_type == 'pre-release' }}
 
   cleanup:

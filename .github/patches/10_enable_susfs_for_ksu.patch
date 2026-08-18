@@ -1,6 +1,6 @@
 From: midori01 <lv@lvlv.lv>
 Date: Tue, 18 Aug 2026 15:00:00 +0900
-Subject: [PATCH] Enable SUSFS for MidoriSU-KO
+Subject: [PATCH] Enable SUSFS for KowSU
 
 ---
  kernel/Kbuild                     |  15 --
@@ -2857,9 +2857,9 @@ index 39d9f486c..3361590ac 100644
 +    if (magic2 == KSU_INSTALL_MAGIC2)
 +        return ksu_supercall_reboot_handler(arg);
 +
-+    // ============ forward extensions to midorisu_handle_sys_reboot ============
-+    extern int midorisu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg);
-+    return midorisu_handle_sys_reboot(magic1, magic2, cmd, arg);
++    // ============ forward extensions to kowsu_handle_sys_reboot ============
++    extern int kowsu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg);
++    return kowsu_handle_sys_reboot(magic1, magic2, cmd, arg);
 +}
 +
  static int do_nuke_ext4_sysfs(void __user *arg)
@@ -2882,7 +2882,7 @@ index dddb9128a..fd2da6658 100644
  
  // downstream: make sure to pass arg as reference, this can allow us to extend things.
 -static int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg)
-+int midorisu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg)
++int kowsu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg)
  {
  
      if (magic1 != KSU_INSTALL_MAGIC1)
@@ -2980,4 +2980,3 @@ index b74f43005..9279119f8 100644
  void ksu_supercalls_exit(void);
 -- 
 2.55.0
-

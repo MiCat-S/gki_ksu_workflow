@@ -8,9 +8,9 @@
 
 # 🌀 GKI KSU Workflow
 
-![License](https://img.shields.io/github/license/midori01/gki_ksu_workflow?style=flat-square&color=blue)
-![Last Commit](https://img.shields.io/github/last-commit/midori01/gki_ksu_workflow?style=flat-square&color=green)
-![Release](https://img.shields.io/github/v/release/midori01/gki_ksu_workflow?style=flat-square&color=orange)
+![License](https://img.shields.io/github/license/reF1nd/gki_ksu_workflow?style=flat-square&color=blue)
+![Last Commit](https://img.shields.io/github/last-commit/reF1nd/gki_ksu_workflow?style=flat-square&color=green)
+![Release](https://img.shields.io/github/v/release/reF1nd/gki_ksu_workflow?style=flat-square&color=orange)
 
 ![Android](https://img.shields.io/badge/Android-GKI-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![Kernel](https://img.shields.io/badge/Kernel-6.1_~_6.12-2F363D?style=for-the-badge&logo=linux&logoColor=white)
@@ -39,49 +39,40 @@
 
 | バリアント | SUSFS | Droidspaces | フック方式 |
 | :--- | :---: | :---: | :--- |
-| [MidoriSU-KO](https://github.com/KOWX712/KernelSU) | ❌ | ❌ | `Kprobes` |
-| [MidoriSU-KO-DS](https://github.com/KOWX712/KernelSU) | ❌ | ✅ | `Kprobes` |
-| [MidoriSU-KO-SUSFS](https://github.com/KOWX712/KernelSU) | ✅ | ❌ | `Inline` |
-| [MidoriSU-KO-SUSFS-DS](https://github.com/KOWX712/KernelSU) | ✅ | ✅ | `Inline` |
-| [MidoriSU-NX](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ❌ | `Tracepoint` |
-| [MidoriSU-NX-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ✅ | `Tracepoint` |
-| [MidoriSU-NX-SUSFS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ❌ | `Inline` |
-| [MidoriSU-NX-SUSFS-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ✅ | `Inline` |
-| [MidoriSU-OG](https://github.com/tiann/KernelSU) | ❌ | ❌ | `Kprobes` |
-| [MidoriSU-OG-DS](https://github.com/tiann/KernelSU) | ❌ | ✅ | `Kprobes` |
-| [MidoriSU-OG-SUSFS](https://github.com/tiann/KernelSU) | ✅ | ❌ | `Inline` |
-| [MidoriSU-OG-SUSFS-DS](https://github.com/tiann/KernelSU) | ✅ | ✅ | `Inline` |
-| [MidoriSU-RE](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ❌ | `Manual` |
-| [MidoriSU-RE-DS](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ✅ | `Manual` |
-| [MidoriSU-RE-SUSFS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ❌ | `Inline` |
-| [MidoriSU-RE-SUSFS-DS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ✅ | `Inline` |
-| [MidoriSU-XX](https://github.com/backslashxx/KernelSU) | ❌ | ❌ | `Hookless` |
-| [MidoriSU-XX-DS](https://github.com/backslashxx/KernelSU) | ❌ | ✅ | `Hookless` |
-| [MidoriSU-XX-SUSFS](https://github.com/backslashxx/KernelSU) | ✅ | ❌ | `De-inlined` |
-| [MidoriSU-XX-SUSFS-DS](https://github.com/backslashxx/KernelSU) | ✅ | ✅ | `De-inlined` |
+| [KowSU](https://github.com/KOWX712/KernelSU) | ❌ | ❌ | `Kprobes` |
+| [KowSU-DS](https://github.com/KOWX712/KernelSU) | ❌ | ✅ | `Kprobes` |
+| [KowSU-SUSFS](https://github.com/KOWX712/KernelSU) | ✅ | ❌ | `Inline` |
+| [KowSU-SUSFS-DS](https://github.com/KOWX712/KernelSU) | ✅ | ✅ | `Inline` |
+| [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ❌ | `Tracepoint` |
+| [KernelSU-Next-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ✅ | `Tracepoint` |
+| [KernelSU-Next-SUSFS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ❌ | `Inline` |
+| [KernelSU-Next-SUSFS-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ✅ | `Inline` |
+| [KernelSU-Official](https://github.com/tiann/KernelSU) | ❌ | ❌ | `Kprobes` |
+| [KernelSU-Official-DS](https://github.com/tiann/KernelSU) | ❌ | ✅ | `Kprobes` |
+| [KernelSU-Official-SUSFS](https://github.com/tiann/KernelSU) | ✅ | ❌ | `Inline` |
+| [KernelSU-Official-SUSFS-DS](https://github.com/tiann/KernelSU) | ✅ | ✅ | `Inline` |
+| [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ❌ | `Manual` |
+| [ReSukiSU-DS](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ✅ | `Manual` |
+| [ReSukiSU-SUSFS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ❌ | `Inline` |
+| [ReSukiSU-SUSFS-DS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ✅ | `Inline` |
+| [KernelSU-XX](https://github.com/backslashxx/KernelSU) | ❌ | ❌ | `Hookless` |
+| [KernelSU-XX-DS](https://github.com/backslashxx/KernelSU) | ❌ | ✅ | `Hookless` |
+| [KernelSU-XX-SUSFS](https://github.com/backslashxx/KernelSU) | ✅ | ❌ | `De-inlined` |
+| [KernelSU-XX-SUSFS-DS](https://github.com/backslashxx/KernelSU) | ✅ | ✅ | `De-inlined` |
 
-> \* **MidoriSU-XX および MidoriSU-RE のフック方式:** 実行時に `hook_mode` で切り替え可能です。
-> - `hookless` — MidoriSU-XX のデフォルト；すべてのカーネルバージョンで `CONFIG_KSU_HACK_ARM64_BRANCH_LINK` を使用
-> - `manual` — MidoriSU-RE のデフォルト
-> - `tracepoint` — MidoriSU-RE のみ対応
+> \* **KernelSU-XX および ReSukiSU のフック方式:** 実行時に `hook_mode` で切り替え可能です。
+> - `hookless` — KernelSU-XX のデフォルト；すべてのカーネルバージョンで `CONFIG_KSU_HACK_ARM64_BRANCH_LINK` を使用
+> - `manual` — ReSukiSU のデフォルト
+> - `tracepoint` — ReSukiSU のみ対応
 
 > [!TIP]
 > **マトリクスビルドの仕組み:** マトリクスは常にバリアントごとに **1 つの成果物** のみを生成します。有効化した機能（Droidspaces / SUSFS）は、その単一の成果物に適用されます。5 つのバリアントすべてを選択した場合、カーネルバージョンあたり **5 つのビルド** が実行されます。`kernel_version` で `all` を選択すると、6.1 / 6.6 / 6.12 が並列コンパイルされ、合計 **15 のジョブ** が同時に実行されます。
 
 ---
 
-## 📱 MidoriSU マネージャー
+## 📱 マネージャー
 
-[**MidoriSU**](https://github.com/midori01/KernelSU) は、MidoriSU 全カーネルバリアント対応の公式コンパニオンアプリです。[**KowSU**](https://github.com/KOWX712/KernelSU) をベースに独自の改修を施しており、**KO、NX、OG、RE、XX** の全バリアント、および SUSFS / Droidspaces の全組み合わせにシームレスに対応します。
-
-| 機能 | 説明 |
-| :--- | :--- |
-| **ホーム画面** | KSU ドライバ名、フックタイプ、SUSFS バージョン、Droidspaces バージョン、Re:Kernel/ReKernel-X バージョン、カーネルビルド時刻を一目で確認可能。 |
-| **カーネルシンボル** | `/proc/kallsyms` をアプリ内で閲覧・検索・共有。 |
-| **カーネルログ** | dmesg 出力の表示・検索・共有に対応し、迅速なデバッグが可能。 |
-| **カーネルコンフィグ** | カーネルビルドオプション（`CONFIG_*`）の確認・検索・共有が可能。 |
-| **Boot イメージ** | アプリから離れずに `boot.img` のバックアップ / フラッシュを実行可能。 |
-| **SELinux 切替** | Enforcing モード / Permissive モードをワンタップで即時切替。 |
+選択したアップストリームが提供するマネージャーを使用してください：[KowSU](https://github.com/KOWX712/KernelSU)、[KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next)、[KernelSU Official](https://github.com/tiann/KernelSU)、[ReSukiSU](https://github.com/ReSukiSU/ReSukiSU)、または [KernelSU-XX](https://github.com/backslashxx/KernelSU)。ワークフローは各アップストリーム本来のマネージャー検証を維持し、共通マネージャー APK は同梱しません。
 
 ---
 
@@ -89,12 +80,12 @@
 
 | 方式 | メカニズムと特徴 |
 | :--- | :--- |
-| `Kprobes` | 実行時に kprobe ブレークポイントを用いてカーネル関数を動的にフックします。カーネルへの影響が最小限で、幅広い互換性を持ちます。**MidoriSU-KO および MidoriSU-OG（非 SUSFS）のデフォルト。** |
-| `Tracepoint` | カーネルの静的な syscall tracepoint 基盤（`sys_enter`/`sys_exit`）にフックするため、カーネルソースの改変を行いません。**MidoriSU-NX（非 SUSFS）のデフォルト。** |
-| `Inline` | `#ifdef CONFIG_KSU_SUSFS` ブロックをカーネルサブシステムのソースに直接埋め込む、コンパイル時注入方式です。`static_key` 分岐により実行時の切り替えが可能です。kprobe や LSM フックには依存しません。VFS（`exec`、`open`、`stat`、`readdir`、`statfs`）、SELinux（`avc`、`hooks`、`services`）、input、mounts、procfs に組み込まれます。**MidoriSU-KO-SUSFS、MidoriSU-NX-SUSFS、MidoriSU-RE-SUSFS、MidoriSU-OG-SUSFS で使用。** |
-| `De-inlined` | `#ifdef CONFIG_KSU_SUSFS` によるインラインブロックを使用せず、カーネルソースへのパッチ適用により SUSFS フックを組み込みます。SUSFS ロジックがコアカーネルサブシステムからより明確に分離されます。**MidoriSU-XX-SUSFS で使用。** |
-| `Manual` | カーネルソースへの静的なパッチ適用方式です。コンパイル時に独自のフックをコアカーネルサブシステムへ注入します。**MidoriSU-RE（非 SUSFS）のデフォルト。** |
-| `Hookless` | KernelSU 組み込みの機構のみを使用します。すべてのカーネルバージョンで `CONFIG_KSU_HACK_ARM64_BRANCH_LINK` を有効化し、カーネルソースの改変は一切行いません。KernelSU 内部のフック基盤に完全に依存します。**MidoriSU-XX（非 SUSFS）のデフォルト。** |
+| `Kprobes` | 実行時に kprobe ブレークポイントを用いてカーネル関数を動的にフックします。カーネルへの影響が最小限で、幅広い互換性を持ちます。**KowSU および KernelSU Official（非 SUSFS）のデフォルト。** |
+| `Tracepoint` | カーネルの静的な syscall tracepoint 基盤（`sys_enter`/`sys_exit`）にフックするため、カーネルソースの改変を行いません。**KernelSU-Next（非 SUSFS）のデフォルト。** |
+| `Inline` | `#ifdef CONFIG_KSU_SUSFS` ブロックをカーネルサブシステムのソースに直接埋め込む、コンパイル時注入方式です。`static_key` 分岐により実行時の切り替えが可能です。kprobe や LSM フックには依存しません。VFS（`exec`、`open`、`stat`、`readdir`、`statfs`）、SELinux（`avc`、`hooks`、`services`）、input、mounts、procfs に組み込まれます。**KowSU、KernelSU-Next、ReSukiSU、KernelSU Official の SUSFS ビルドで使用。** |
+| `De-inlined` | `#ifdef CONFIG_KSU_SUSFS` によるインラインブロックを使用せず、カーネルソースへのパッチ適用により SUSFS フックを組み込みます。SUSFS ロジックがコアカーネルサブシステムからより明確に分離されます。**KernelSU-XX-SUSFS で使用。** |
+| `Manual` | カーネルソースへの静的なパッチ適用方式です。コンパイル時に独自のフックをコアカーネルサブシステムへ注入します。**ReSukiSU（非 SUSFS）のデフォルト。** |
+| `Hookless` | KernelSU 組み込みの機構のみを使用します。すべてのカーネルバージョンで `CONFIG_KSU_HACK_ARM64_BRANCH_LINK` を有効化し、カーネルソースの改変は一切行いません。KernelSU 内部のフック基盤に完全に依存します。**KernelSU-XX（非 SUSFS）のデフォルト。** |
 
 ---
 

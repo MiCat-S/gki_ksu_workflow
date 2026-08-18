@@ -8,9 +8,9 @@
 
 # 🌀 GKI KSU Workflow
 
-![License](https://img.shields.io/github/license/midori01/gki_ksu_workflow?style=flat-square&color=blue)
-![Last Commit](https://img.shields.io/github/last-commit/midori01/gki_ksu_workflow?style=flat-square&color=green)
-![Release](https://img.shields.io/github/v/release/midori01/gki_ksu_workflow?style=flat-square&color=orange)
+![License](https://img.shields.io/github/license/reF1nd/gki_ksu_workflow?style=flat-square&color=blue)
+![Last Commit](https://img.shields.io/github/last-commit/reF1nd/gki_ksu_workflow?style=flat-square&color=green)
+![Release](https://img.shields.io/github/v/release/reF1nd/gki_ksu_workflow?style=flat-square&color=orange)
 
 ![Android](https://img.shields.io/badge/Android-GKI-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![Kernel](https://img.shields.io/badge/Kernel-6.1_~_6.12-2F363D?style=for-the-badge&logo=linux&logoColor=white)
@@ -39,49 +39,40 @@ All kernel version-specific settings are centralized in [`.github/config/kernel_
 
 | Variant | SUSFS | Droidspaces | Hook Type |
 | :--- | :---: | :---: | :--- |
-| [MidoriSU-KO](https://github.com/KOWX712/KernelSU) | ❌ | ❌ | `Kprobes` |
-| [MidoriSU-KO-DS](https://github.com/KOWX712/KernelSU) | ❌ | ✅ | `Kprobes` |
-| [MidoriSU-KO-SUSFS](https://github.com/KOWX712/KernelSU) | ✅ | ❌ | `Inline` |
-| [MidoriSU-KO-SUSFS-DS](https://github.com/KOWX712/KernelSU) | ✅ | ✅ | `Inline` |
-| [MidoriSU-NX](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ❌ | `Tracepoint` |
-| [MidoriSU-NX-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ✅ | `Tracepoint` |
-| [MidoriSU-NX-SUSFS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ❌ | `Inline` |
-| [MidoriSU-NX-SUSFS-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ✅ | `Inline` |
-| [MidoriSU-OG](https://github.com/tiann/KernelSU) | ❌ | ❌ | `Kprobes` |
-| [MidoriSU-OG-DS](https://github.com/tiann/KernelSU) | ❌ | ✅ | `Kprobes` |
-| [MidoriSU-OG-SUSFS](https://github.com/tiann/KernelSU) | ✅ | ❌ | `Inline` |
-| [MidoriSU-OG-SUSFS-DS](https://github.com/tiann/KernelSU) | ✅ | ✅ | `Inline` |
-| [MidoriSU-RE](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ❌ | `Manual` |
-| [MidoriSU-RE-DS](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ✅ | `Manual` |
-| [MidoriSU-RE-SUSFS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ❌ | `Inline` |
-| [MidoriSU-RE-SUSFS-DS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ✅ | `Inline` |
-| [MidoriSU-XX](https://github.com/backslashxx/KernelSU) | ❌ | ❌ | `Hookless` |
-| [MidoriSU-XX-DS](https://github.com/backslashxx/KernelSU) | ❌ | ✅ | `Hookless` |
-| [MidoriSU-XX-SUSFS](https://github.com/backslashxx/KernelSU) | ✅ | ❌ | `De-inlined` |
-| [MidoriSU-XX-SUSFS-DS](https://github.com/backslashxx/KernelSU) | ✅ | ✅ | `De-inlined` |
+| [KowSU](https://github.com/KOWX712/KernelSU) | ❌ | ❌ | `Kprobes` |
+| [KowSU-DS](https://github.com/KOWX712/KernelSU) | ❌ | ✅ | `Kprobes` |
+| [KowSU-SUSFS](https://github.com/KOWX712/KernelSU) | ✅ | ❌ | `Inline` |
+| [KowSU-SUSFS-DS](https://github.com/KOWX712/KernelSU) | ✅ | ✅ | `Inline` |
+| [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ❌ | `Tracepoint` |
+| [KernelSU-Next-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ✅ | `Tracepoint` |
+| [KernelSU-Next-SUSFS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ❌ | `Inline` |
+| [KernelSU-Next-SUSFS-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ✅ | `Inline` |
+| [KernelSU-Official](https://github.com/tiann/KernelSU) | ❌ | ❌ | `Kprobes` |
+| [KernelSU-Official-DS](https://github.com/tiann/KernelSU) | ❌ | ✅ | `Kprobes` |
+| [KernelSU-Official-SUSFS](https://github.com/tiann/KernelSU) | ✅ | ❌ | `Inline` |
+| [KernelSU-Official-SUSFS-DS](https://github.com/tiann/KernelSU) | ✅ | ✅ | `Inline` |
+| [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ❌ | `Manual` |
+| [ReSukiSU-DS](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ✅ | `Manual` |
+| [ReSukiSU-SUSFS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ❌ | `Inline` |
+| [ReSukiSU-SUSFS-DS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ✅ | `Inline` |
+| [KernelSU-XX](https://github.com/backslashxx/KernelSU) | ❌ | ❌ | `Hookless` |
+| [KernelSU-XX-DS](https://github.com/backslashxx/KernelSU) | ❌ | ✅ | `Hookless` |
+| [KernelSU-XX-SUSFS](https://github.com/backslashxx/KernelSU) | ✅ | ❌ | `De-inlined` |
+| [KernelSU-XX-SUSFS-DS](https://github.com/backslashxx/KernelSU) | ✅ | ✅ | `De-inlined` |
 
-> \* **MidoriSU-XX & MidoriSU-RE Hook Type:** Runtime-configurable via `hook_mode`.
-> - `hookless` — default for MidoriSU-XX; uses `CONFIG_KSU_HACK_ARM64_BRANCH_LINK` on all kernel versions
-> - `manual` — default for MidoriSU-RE
-> - `tracepoint` — MidoriSU-RE only
+> \* **KernelSU-XX & ReSukiSU Hook Type:** Runtime-configurable via `hook_mode`.
+> - `hookless` — default for KernelSU-XX; uses `CONFIG_KSU_HACK_ARM64_BRANCH_LINK` on all kernel versions
+> - `manual` — default for ReSukiSU
+> - `tracepoint` — ReSukiSU only
 
 > [!TIP]
 > **Matrix Build Orchestration:** The matrix always produces exactly **1 artifact per variant** — the enabled features (Droidspaces and/or SUSFS) are applied to that single artifact. With all 5 variants selected, this yields **5 builds per kernel version**. Choosing `all` from the `kernel_version` dropdown compiles 6.1, 6.6 and 6.12 in parallel for a total of **15 concurrent jobs**.
 
 ---
 
-## 📱 MidoriSU Manager
+## 📱 Managers
 
-[**MidoriSU**](https://github.com/midori01/KernelSU) is the official companion app for all MidoriSU kernel variants. Built on [**KowSU**](https://github.com/KOWX712/KernelSU) with custom modifications, it offers seamless compatibility across the entire MidoriSU family — **KO, NX, OG, RE, XX** — including all SUSFS and Droidspaces combinations.
-
-| Feature | Description |
-| :--- | :--- |
-| **Homepage Overview** | Displays essential kernel info at a glance: KSU driver name, hook type, SUSFS version, Droidspaces version, Re:Kernel/ReKernel-X version, and kernel build timestamp. |
-| **Kernel Symbols** | Browse, search, and share `/proc/kallsyms` directly within the app. |
-| **Kernel Logs** | View, search, and share dmesg output for quick debugging. |
-| **Kernel Config** | Inspect, search, and share kernel build options (`CONFIG_*`). |
-| **Boot Image** | Backup and flash `boot.img` without leaving the app. |
-| **SELinux Toggle** | Instantly switch between Enforcing and Permissive SELinux modes. |
+Use the manager distributed by the selected upstream: [KowSU](https://github.com/KOWX712/KernelSU), [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next), [KernelSU Official](https://github.com/tiann/KernelSU), [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU), or [KernelSU-XX](https://github.com/backslashxx/KernelSU). The workflow preserves each upstream's manager verification and does not bundle a universal manager APK.
 
 ---
 
@@ -89,12 +80,12 @@ All kernel version-specific settings are centralized in [`.github/config/kernel_
 
 | Type | Mechanism & Characteristics |
 | :--- | :--- |
-| `Kprobes` | Dynamically instruments kernel functions at runtime via kprobe breakpoints. Minimal kernel footprint, broad compatibility. **Default for MidoriSU-KO and MidoriSU-OG** (non-SUSFS). |
-| `Tracepoint` | Hooks into the kernel's static syscall tracepoint infrastructure (`sys_enter`/`sys_exit`) without modifying kernel source. **Default for MidoriSU-NX** (non-SUSFS). |
-| `Inline` | Compile-time injection via `#ifdef CONFIG_KSU_SUSFS` blocks embedded directly into kernel subsystem source. Uses `static_key` branches for runtime toggling. No reliance on kprobes or LSM hooks. Hardwired into VFS (`exec`, `open`, `stat`, `readdir`, `statfs`), SELinux (`avc`, `hooks`, `services`), input, mounts, and procfs. **Used by MidoriSU-KO-SUSFS, MidoriSU-NX-SUSFS, MidoriSU-RE-SUSFS, MidoriSU-OG-SUSFS.** |
-| `De-inlined` | SUSFS hooks applied via kernel source patching rather than inline `#ifdef CONFIG_KSU_SUSFS` blocks. Cleaner separation of SUSFS logic from core kernel subsystems. **Used by MidoriSU-XX-SUSFS.** |
-| `Manual` | Static kernel source patching. Custom hooks injected at compile time into core kernel subsystems. **Default for MidoriSU-RE** (non-SUSFS). |
-| `Hookless` | Pure KernelSU built-in mechanisms. Always enables `CONFIG_KSU_HACK_ARM64_BRANCH_LINK` regardless of kernel version. Zero kernel source modification. Relies entirely on KernelSU's internal hooking infrastructure. **Default for MidoriSU-XX** (non-SUSFS). |
+| `Kprobes` | Dynamically instruments kernel functions at runtime via kprobe breakpoints. Minimal kernel footprint, broad compatibility. **Default for KowSU and KernelSU Official** (non-SUSFS). |
+| `Tracepoint` | Hooks into the kernel's static syscall tracepoint infrastructure (`sys_enter`/`sys_exit`) without modifying kernel source. **Default for KernelSU-Next** (non-SUSFS). |
+| `Inline` | Compile-time injection via `#ifdef CONFIG_KSU_SUSFS` blocks embedded directly into kernel subsystem source. Uses `static_key` branches for runtime toggling. No reliance on kprobes or LSM hooks. Hardwired into VFS (`exec`, `open`, `stat`, `readdir`, `statfs`), SELinux (`avc`, `hooks`, `services`), input, mounts, and procfs. **Used by the KowSU, KernelSU-Next, ReSukiSU, and KernelSU Official SUSFS builds.** |
+| `De-inlined` | SUSFS hooks applied via kernel source patching rather than inline `#ifdef CONFIG_KSU_SUSFS` blocks. Cleaner separation of SUSFS logic from core kernel subsystems. **Used by KernelSU-XX-SUSFS.** |
+| `Manual` | Static kernel source patching. Custom hooks injected at compile time into core kernel subsystems. **Default for ReSukiSU** (non-SUSFS). |
+| `Hookless` | Pure KernelSU built-in mechanisms. Always enables `CONFIG_KSU_HACK_ARM64_BRANCH_LINK` regardless of kernel version. Zero kernel source modification. Relies entirely on KernelSU's internal hooking infrastructure. **Default for KernelSU-XX** (non-SUSFS). |
 
 ---
 

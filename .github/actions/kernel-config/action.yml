@@ -16,7 +16,7 @@ inputs:
     required: false
     default: '0'
   variant:
-    description: 'KSU variant (MidoriSU-KO, MidoriSU-XX, MidoriSU-RE, etc.)'
+    description: 'KSU variant (KowSU, KernelSU-Next, ReSukiSU, etc.)'
     required: true
   hook_mode:
     description: 'Hook mode'
@@ -99,7 +99,7 @@ runs:
         EOF
         
         case "${{ inputs.variant }}" in
-          MidoriSU-XX)
+          KernelSU-XX)
             if [ "${{ inputs.hook_mode }}" = "hookless" ]; then
               cat >> $DEFCONFIG <<-'EOF'
         CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y
@@ -112,7 +112,7 @@ runs:
         EOF
             fi
             ;;
-          MidoriSU-RE)
+          ReSukiSU)
             if [ "${{ inputs.enable_susfs }}" = "true" ]; then
               cat >> $DEFCONFIG <<-'EOF'
         CONFIG_KSU_TOOLKIT_SUPPORT=y

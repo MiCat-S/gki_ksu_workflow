@@ -1,6 +1,6 @@
 From: midori01 <lv@lvlv.lv>
 Date: Tue, 18 Aug 2026 15:00:00 +0900
-Subject: [PATCH] Enable SUSFS for MidoriSU-XX
+Subject: [PATCH] Enable SUSFS for KernelSU-XX
 
 ---
  kernel/Kconfig               | 90 +++++++++++++++++++++++++++++++++
@@ -519,4 +519,3 @@ index 8c207930d..e282fe050 100644
  	if (magic2 == KSU_INSTALL_MAGIC2)
 -- 
 2.55.0
-

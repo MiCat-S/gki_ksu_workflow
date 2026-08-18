@@ -1,6 +1,6 @@
 From: backslashxx
 Date: Fri, 31 Jul 2026 19:00:23 +0900
-Subject: [PATCH] Enable SUSFS for MidoriSU-XX
+Subject: [PATCH] Enable extra features for KernelSU-XX
 
 ---
  kernel/hook/branch_link_hook_arm64.c |  4 ++
@@ -143,4 +143,3 @@ index b1cf6b571..f4dcc40d5 100644
  
 -- 
 2.55.0
-

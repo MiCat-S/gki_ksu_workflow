@@ -1,6 +1,6 @@
 From: midori01 <lv@lvlv.lv>
 Date: Sun, 12 Jul 2026 19:45:23 +0900
-Subject: [PATCH] Enable KSU toolkit for MidoriSU-OG-SUSFS
+Subject: [PATCH] Enable KSU toolkit for KernelSU Official with SUSFS
 
 ---
  kernel/feature/sucompat.c    |   7 +-
@@ -81,8 +81,8 @@ index 52b19fcee..67bb398a6 100644
          return ksu_supercall_reboot_handler(arg);
  
 +#ifdef CONFIG_KSU_SUSFS
-+    extern int midorisu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg);
-+    return midorisu_handle_sys_reboot(magic1, magic2, cmd, arg);
++    extern int ksu_toolkit_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg);
++    return ksu_toolkit_handle_sys_reboot(magic1, magic2, cmd, arg);
 +#else
      return -EINVAL;
 +#endif
@@ -192,7 +192,7 @@ index a959063a7..0ceaf36d0 100644
  }
  
 +#ifdef CONFIG_KSU_SUSFS
-+int midorisu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg)
++int ksu_toolkit_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg)
 +#else
 +int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg)
 +#endif
@@ -372,4 +372,3 @@ index 483e5069c..e0605a86a 100644
  #endif // __KSU_H_SUPERCALL
 -- 
 2.54.0
-

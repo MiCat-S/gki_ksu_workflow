@@ -6,7 +6,7 @@ TMP_DIR="/tmp/kernel-check"
 rm -rf "$TMP_DIR"
 mkdir -p "$TMP_DIR"
 
-REPO="${GITHUB_REPOSITORY:-midori01/gki_ksu_workflow}"
+REPO="${GITHUB_REPOSITORY:-reF1nd/gki_ksu_workflow}"
 
 TAG_DATES_612=$(jq -r '.["6.12"].revisions | to_entries[] | select(.value.asb_date != "lts") | .value.asb_date' "$CONFIG_FILE")
 TAG_DATES_66=$(jq -r '.["6.6"].revisions | to_entries[] | select(.value.asb_date != "lts") | .value.asb_date' "$CONFIG_FILE")

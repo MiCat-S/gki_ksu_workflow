@@ -1,6 +1,6 @@
 From: midori01 <lv@lvlv.lv>
 Date: Sun, 12 Jul 2026 19:45:23 +0900
-Subject: [PATCH] Enable extra features for MidoriSU-OG
+Subject: [PATCH] Enable extra features for KernelSU Official
 
 ---
  kernel/supercall/dispatch.c | 65 +++++++++++++++++++++++++++++++++++++
@@ -124,4 +124,3 @@ index 8f345086c..5b0a803cd 100644
  #endif
 -- 
 2.54.0
-

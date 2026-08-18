@@ -8,9 +8,9 @@
 
 # 🌀 GKI KSU Workflow
 
-![License](https://img.shields.io/github/license/midori01/gki_ksu_workflow?style=flat-square&color=blue)
-![Last Commit](https://img.shields.io/github/last-commit/midori01/gki_ksu_workflow?style=flat-square&color=green)
-![Release](https://img.shields.io/github/v/release/midori01/gki_ksu_workflow?style=flat-square&color=orange)
+![License](https://img.shields.io/github/license/reF1nd/gki_ksu_workflow?style=flat-square&color=blue)
+![Last Commit](https://img.shields.io/github/last-commit/reF1nd/gki_ksu_workflow?style=flat-square&color=green)
+![Release](https://img.shields.io/github/v/release/reF1nd/gki_ksu_workflow?style=flat-square&color=orange)
 
 ![Android](https://img.shields.io/badge/Android-GKI-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![Kernel](https://img.shields.io/badge/Kernel-6.1_~_6.12-2F363D?style=for-the-badge&logo=linux&logoColor=white)
@@ -39,49 +39,40 @@
 
 | 배리언트 | SUSFS | Droidspaces | 후크 방식 |
 | :--- | :---: | :---: | :--- |
-| [MidoriSU-KO](https://github.com/KOWX712/KernelSU) | ❌ | ❌ | `Kprobes` |
-| [MidoriSU-KO-DS](https://github.com/KOWX712/KernelSU) | ❌ | ✅ | `Kprobes` |
-| [MidoriSU-KO-SUSFS](https://github.com/KOWX712/KernelSU) | ✅ | ❌ | `Inline` |
-| [MidoriSU-KO-SUSFS-DS](https://github.com/KOWX712/KernelSU) | ✅ | ✅ | `Inline` |
-| [MidoriSU-NX](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ❌ | `Tracepoint` |
-| [MidoriSU-NX-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ✅ | `Tracepoint` |
-| [MidoriSU-NX-SUSFS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ❌ | `Inline` |
-| [MidoriSU-NX-SUSFS-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ✅ | `Inline` |
-| [MidoriSU-OG](https://github.com/tiann/KernelSU) | ❌ | ❌ | `Kprobes` |
-| [MidoriSU-OG-DS](https://github.com/tiann/KernelSU) | ❌ | ✅ | `Kprobes` |
-| [MidoriSU-OG-SUSFS](https://github.com/tiann/KernelSU) | ✅ | ❌ | `Inline` |
-| [MidoriSU-OG-SUSFS-DS](https://github.com/tiann/KernelSU) | ✅ | ✅ | `Inline` |
-| [MidoriSU-RE](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ❌ | `Manual` |
-| [MidoriSU-RE-DS](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ✅ | `Manual` |
-| [MidoriSU-RE-SUSFS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ❌ | `Inline` |
-| [MidoriSU-RE-SUSFS-DS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ✅ | `Inline` |
-| [MidoriSU-XX](https://github.com/backslashxx/KernelSU) | ❌ | ❌ | `Hookless` |
-| [MidoriSU-XX-DS](https://github.com/backslashxx/KernelSU) | ❌ | ✅ | `Hookless` |
-| [MidoriSU-XX-SUSFS](https://github.com/backslashxx/KernelSU) | ✅ | ❌ | `De-inlined` |
-| [MidoriSU-XX-SUSFS-DS](https://github.com/backslashxx/KernelSU) | ✅ | ✅ | `De-inlined` |
+| [KowSU](https://github.com/KOWX712/KernelSU) | ❌ | ❌ | `Kprobes` |
+| [KowSU-DS](https://github.com/KOWX712/KernelSU) | ❌ | ✅ | `Kprobes` |
+| [KowSU-SUSFS](https://github.com/KOWX712/KernelSU) | ✅ | ❌ | `Inline` |
+| [KowSU-SUSFS-DS](https://github.com/KOWX712/KernelSU) | ✅ | ✅ | `Inline` |
+| [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ❌ | `Tracepoint` |
+| [KernelSU-Next-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ✅ | `Tracepoint` |
+| [KernelSU-Next-SUSFS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ❌ | `Inline` |
+| [KernelSU-Next-SUSFS-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ✅ | `Inline` |
+| [KernelSU-Official](https://github.com/tiann/KernelSU) | ❌ | ❌ | `Kprobes` |
+| [KernelSU-Official-DS](https://github.com/tiann/KernelSU) | ❌ | ✅ | `Kprobes` |
+| [KernelSU-Official-SUSFS](https://github.com/tiann/KernelSU) | ✅ | ❌ | `Inline` |
+| [KernelSU-Official-SUSFS-DS](https://github.com/tiann/KernelSU) | ✅ | ✅ | `Inline` |
+| [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ❌ | `Manual` |
+| [ReSukiSU-DS](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ✅ | `Manual` |
+| [ReSukiSU-SUSFS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ❌ | `Inline` |
+| [ReSukiSU-SUSFS-DS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ✅ | `Inline` |
+| [KernelSU-XX](https://github.com/backslashxx/KernelSU) | ❌ | ❌ | `Hookless` |
+| [KernelSU-XX-DS](https://github.com/backslashxx/KernelSU) | ❌ | ✅ | `Hookless` |
+| [KernelSU-XX-SUSFS](https://github.com/backslashxx/KernelSU) | ✅ | ❌ | `De-inlined` |
+| [KernelSU-XX-SUSFS-DS](https://github.com/backslashxx/KernelSU) | ✅ | ✅ | `De-inlined` |
 
-> \* **MidoriSU-XX 및 MidoriSU-RE 후크 방식:** 실행 시 `hook_mode` 옵션을 통해 변경할 수 있습니다.
-> - `hookless` — MidoriSU-XX의 기본값; 모든 커널 버전에서 `CONFIG_KSU_HACK_ARM64_BRANCH_LINK` 사용
-> - `manual` — MidoriSU-RE의 기본값
-> - `tracepoint` — MidoriSU-RE 전용
+> \* **KernelSU-XX 및 ReSukiSU 후크 방식:** 실행 시 `hook_mode` 옵션을 통해 변경할 수 있습니다.
+> - `hookless` — KernelSU-XX의 기본값; 모든 커널 버전에서 `CONFIG_KSU_HACK_ARM64_BRANCH_LINK` 사용
+> - `manual` — ReSukiSU의 기본값
+> - `tracepoint` — ReSukiSU 전용
 
 > [!TIP]
 > **매트릭스 빌드 동작 방식:** 매트릭스는 항상 배리언트당 정확히 **단 하나의 결과물**만 생성합니다. 활성화된 기능(Droidspaces / SUSFS)은 해당 결과물에 함께 적용됩니다. 5개 배리언트를 모두 선택하면 커널 버전당 **5개의 빌드**가 실행됩니다. `kernel_version`에서 `all`을 선택하면 6.1 / 6.6 / 6.12 버전이 병렬로 컴파일되어 총 **15개의 작업(Job)**이 동시에 실행됩니다.
 
 ---
 
-## 📱 MidoriSU 매니저
+## 📱 매니저
 
-[**MidoriSU**](https://github.com/midori01/KernelSU)는 모든 MidoriSU 커널 변종을 지원하는 공식 동반 앱입니다. [**KowSU**](https://github.com/KOWX712/KernelSU)를 기반으로 커스텀 수정을 거쳐, **KO, NX, OG, RE, XX** 전 변종은 물론 모든 SUSFS 및 Droidspaces 조합과 완벽히 호환됩니다.
-
-| 기능 | 설명 |
-| :--- | :--- |
-| **홈 화면** | KSU 드라이버명, 후크 유형, SUSFS 버전, Droidspaces 버전, Re:Kernel/ReKernel-X 버전, 커널 빌드 시각을 한눈에 표시합니다. |
-| **커널 심볼** | `/proc/kallsyms`를 앱 내에서 탐색·검색·공유할 수 있습니다. |
-| **커널 로그** | dmesg 출력을 확인·검색·공유할 수 있어 신속한 디버깅이 가능합니다. |
-| **커널 구성** | 커널 빌드 옵션(`CONFIG_*`)을 조회·검색·공유할 수 있습니다. |
-| **Boot 이미지** | 앱 내에서 `boot.img`를 바로 백업하거나 플래시할 수 있습니다. |
-| **SELinux 전환** | Enforcing 모드와 Permissive 모드 간 즉시 전환이 가능합니다. |
+선택한 업스트림에서 제공하는 매니저를 사용하세요: [KowSU](https://github.com/KOWX712/KernelSU), [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next), [KernelSU Official](https://github.com/tiann/KernelSU), [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU), 또는 [KernelSU-XX](https://github.com/backslashxx/KernelSU). 워크플로는 각 업스트림의 기존 매니저 검증을 유지하며 공용 매니저 APK를 포함하지 않습니다.
 
 ---
 
@@ -89,12 +80,12 @@
 
 | 방식 | 메커니즘 및 특징 |
 | :--- | :--- |
-| `Kprobes` | 실행 시 kprobe 브레이크포인트를 사용하여 커널 함수를 동적으로 후킹합니다. 커널에 미치는 영향을 최소화하며 광범위한 호환성을 제공합니다. **MidoriSU-KO 및 MidoriSU-OG(비 SUSFS 환경)의 기본 방식입니다.** |
-| `Tracepoint` | 커널의 정적인 syscall tracepoint 인프라(`sys_enter`/`sys_exit`)에 후킹하므로 커널 소스를 수정하지 않습니다. **MidoriSU-NX(비 SUSFS 환경)의 기본 방식입니다.** |
-| `Inline` | `#ifdef CONFIG_KSU_SUSFS` 블록을 커널 서브시스템 소스에 직접 삽입하는 컴파일 타임 주입 방식입니다. `static_key` 분기를 통해 런타임에 활성/비활성 전환이 가능하며, kprobe나 LSM 후크에 의존하지 않습니다. VFS(`exec`, `open`, `stat`, `readdir`, `statfs`), SELinux(`avc`, `hooks`, `services`), input, mounts, procfs에 내장됩니다. **MidoriSU-KO-SUSFS, MidoriSU-NX-SUSFS, MidoriSU-RE-SUSFS, MidoriSU-OG-SUSFS에서 사용됩니다.** |
-| `De-inlined` | `#ifdef CONFIG_KSU_SUSFS` 인라인 블록을 사용하는 대신 커널 소스에 패치를 적용하여 SUSFS 후크를 통합합니다. 이를 통해 SUSFS 로직이 코어 커널 서브시스템과 더욱 명확하게 분리됩니다. **MidoriSU-XX-SUSFS에서 사용됩니다.** |
-| `Manual` | 커널 소스에 대한 정적 패치 방식입니다. 컴파일 시 자체 후크를 코어 커널 서브시스템에 직접 주입합니다. **MidoriSU-RE(비 SUSFS 환경)의 기본 방식입니다.** |
-| `Hookless` | KernelSU 내장 메커니즘만을 사용합니다. 모든 커널 버전에서 `CONFIG_KSU_HACK_ARM64_BRANCH_LINK`를 활성화하며 커널 소스를 전혀 수정하지 않고 KernelSU 내부의 후크 인프라에 완전히 의존합니다. **MidoriSU-XX(비 SUSFS 환경)의 기본 방식입니다.** |
+| `Kprobes` | 실행 시 kprobe 브레이크포인트를 사용하여 커널 함수를 동적으로 후킹합니다. 커널에 미치는 영향을 최소화하며 광범위한 호환성을 제공합니다. **KowSU 및 KernelSU Official(비 SUSFS 환경)의 기본 방식입니다.** |
+| `Tracepoint` | 커널의 정적인 syscall tracepoint 인프라(`sys_enter`/`sys_exit`)에 후킹하므로 커널 소스를 수정하지 않습니다. **KernelSU-Next(비 SUSFS 환경)의 기본 방식입니다.** |
+| `Inline` | `#ifdef CONFIG_KSU_SUSFS` 블록을 커널 서브시스템 소스에 직접 삽입하는 컴파일 타임 주입 방식입니다. `static_key` 분기를 통해 런타임에 활성/비활성 전환이 가능하며, kprobe나 LSM 후크에 의존하지 않습니다. VFS(`exec`, `open`, `stat`, `readdir`, `statfs`), SELinux(`avc`, `hooks`, `services`), input, mounts, procfs에 내장됩니다. **KowSU, KernelSU-Next, ReSukiSU 및 KernelSU Official SUSFS 빌드에서 사용됩니다.** |
+| `De-inlined` | `#ifdef CONFIG_KSU_SUSFS` 인라인 블록을 사용하는 대신 커널 소스에 패치를 적용하여 SUSFS 후크를 통합합니다. 이를 통해 SUSFS 로직이 코어 커널 서브시스템과 더욱 명확하게 분리됩니다. **KernelSU-XX-SUSFS에서 사용됩니다.** |
+| `Manual` | 커널 소스에 대한 정적 패치 방식입니다. 컴파일 시 자체 후크를 코어 커널 서브시스템에 직접 주입합니다. **ReSukiSU(비 SUSFS 환경)의 기본 방식입니다.** |
+| `Hookless` | KernelSU 내장 메커니즘만을 사용합니다. 모든 커널 버전에서 `CONFIG_KSU_HACK_ARM64_BRANCH_LINK`를 활성화하며 커널 소스를 전혀 수정하지 않고 KernelSU 내부의 후크 인프라에 완전히 의존합니다. **KernelSU-XX(비 SUSFS 환경)의 기본 방식입니다.** |
 
 ---
 

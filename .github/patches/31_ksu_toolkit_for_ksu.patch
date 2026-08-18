@@ -1,6 +1,6 @@
 From: midori01 <lv@lvlv.lv>
 Date: Sun, 12 Jul 2026 19:45:23 +0900
-Subject: [PATCH] Enable KSU toolkit for MidoriSU-OG
+Subject: [PATCH] Enable KSU toolkit for KernelSU Official
 
 ---
  kernel/feature/sucompat.c    |   5 +
@@ -311,4 +311,3 @@ index fbedd11f8..75855bf6d 100644
  #endif // __KSU_H_SUPERCALL
 -- 
 2.54.0
-

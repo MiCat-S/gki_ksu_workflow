@@ -16,8 +16,7 @@ If you discover a security vulnerability in the kernel images distributed throug
 
 Instead, report it privately via one of the following channels:
 
-- **GitHub Security Advisory**: Use the [Private Vulnerability Reporting](https://github.com/midori01/gki_ksu_workflow/security/advisories/new) feature.
-- **Telegram**: Contact [@midori](https://t.me/midori) directly.
+- **GitHub Security Advisory**: Use the [Private Vulnerability Reporting](https://github.com/reF1nd/gki_ksu_workflow/security/advisories/new) feature.
 
 Please include the following details in your report:
 

@@ -1,6 +1,6 @@
 From: midori01 <lv@lvlv.lv>
 Date: Tue, 18 Aug 2026 15:00:00 +0900
-Subject: [PATCH] Enable SUSFS for MidoriSU-NX
+Subject: [PATCH] Enable SUSFS for KernelSU-Next
 
 ---
  kernel/Kbuild                      |  43 +++-
@@ -3668,4 +3668,3 @@ index fbedd11f8..50a35a0fc 100644
  #endif // __KSU_H_SUPERCALL
 -- 
 2.55.0
-
