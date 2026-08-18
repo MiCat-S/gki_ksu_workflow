@@ -1,5 +1,5 @@
 From: midori01 <lv@lvlv.lv>
-Date: Thu, 6 Aug 2026 18:31:59 +0900
+Date: Tue, 18 Aug 2026 15:00:00 +0900
 Subject: [PATCH] Enable SUSFS for MidoriSU-XX
 
 ---
@@ -14,10 +14,10 @@ Subject: [PATCH] Enable SUSFS for MidoriSU-XX
  8 files changed, 374 insertions(+), 2 deletions(-)
 
 diff --git a/kernel/Kconfig b/kernel/Kconfig
-index c18ac59f2..88dddb66b 100644
+index 4708df1f9..b22786fab 100644
 --- a/kernel/Kconfig
 +++ b/kernel/Kconfig
-@@ -95,4 +95,94 @@ config KSU_HEURISTIC_IN_TREE_BUILD
+@@ -116,4 +116,94 @@ config KSU_HEURISTIC_IN_TREE_BUILD
  	depends on KSU
  	default y
  
@@ -113,7 +113,7 @@ index c18ac59f2..88dddb66b 100644
 +
  endmenu
 diff --git a/kernel/hook/setuid_hook.c b/kernel/hook/setuid_hook.c
-index 2c0aeab24..55b21ddb8 100644
+index 925798048..0e6c3d229 100644
 --- a/kernel/hook/setuid_hook.c
 +++ b/kernel/hook/setuid_hook.c
 @@ -1,3 +1,28 @@
@@ -168,9 +168,9 @@ index 2c0aeab24..55b21ddb8 100644
  	return;
  
  install_ksu_fd:
-@@ -32,4 +64,17 @@ install_ksu_fd:
- kill_seccomp:
+@@ -33,4 +65,17 @@ kill_seccomp:
  	disable_seccomp();
+ 	set_thread_flag(TIF_KSU_MANAGED); // sucompat fast-path
  	return;
 +do_umount:
 +	// Handle kernel umount
@@ -187,10 +187,10 @@ index 2c0aeab24..55b21ddb8 100644
 +#endif
  }
 diff --git a/kernel/ksu.c b/kernel/ksu.c
-index 5701e8fb2..ab842a763 100644
+index 5a6a31c9e..ac551a485 100644
 --- a/kernel/ksu.c
 +++ b/kernel/ksu.c
-@@ -152,6 +152,10 @@
+@@ -150,6 +150,10 @@
  #include "hook/kp_ksud.c"
  #endif
  
@@ -198,10 +198,10 @@ index 5701e8fb2..ab842a763 100644
 +#include <linux/susfs.h>
 +#endif // #ifdef CONFIG_KSU_SUSFS
 +
- struct cred* ksu_cred;
- 
- extern void ksu_supercalls_init();
-@@ -250,6 +254,10 @@ static int __init kernelsu_init(void)
+ // track backports and other quirks here
+ // ref: kernel_compat.c, Makefile
+ // yes looks nasty
+@@ -246,6 +250,10 @@ static int __init kernelsu_init(void)
  
  	ksu_throne_tracker_init();
  

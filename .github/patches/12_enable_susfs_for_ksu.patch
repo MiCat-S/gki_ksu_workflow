@@ -1,5 +1,5 @@
 From: midori01 <lv@lvlv.lv>
-Date: Thu, 6 Aug 2026 18:31:59 +0900
+Date: Tue, 18 Aug 2026 15:00:00 +0900
 Subject: [PATCH] Enable SUSFS for MidoriSU-NX
 
 ---
@@ -7,7 +7,7 @@ Subject: [PATCH] Enable SUSFS for MidoriSU-NX
  kernel/Kconfig                     | 107 ++++++++-
  kernel/core/init.c                 |  49 +++-
  kernel/extras.c                    |  22 +-
- kernel/feature/adb_root.c          | 160 ++++++++++++-
+ kernel/feature/adb_root.c          | 162 ++++++++++++-
  kernel/feature/adb_root.h          |   4 +
  kernel/feature/kernel_umount.c     |  13 +-
  kernel/feature/selinux_hide.c      | 167 ++++++++------
@@ -16,7 +16,7 @@ Subject: [PATCH] Enable SUSFS for MidoriSU-NX
  kernel/feature/sucompat.h          |  21 +-
  kernel/hook/setuid_hook.c          |  81 ++++++-
  kernel/hook/setuid_hook.h          |   4 +
- kernel/hook/syscall_event_bridge.c |  74 +++---
+ kernel/hook/syscall_event_bridge.c |  92 ++++----
  kernel/manager/throne_tracker.c    |  92 +++++++-
  kernel/manager/throne_tracker.h    |  52 ++++-
  kernel/policy/allowlist.c          |   2 +
@@ -34,7 +34,7 @@ Subject: [PATCH] Enable SUSFS for MidoriSU-NX
  kernel/supercall/internal.h        |   2 +
  kernel/supercall/supercall.c       | 189 +++++++++------
  kernel/supercall/supercall.h       |   4 +
- 31 files changed, 1872 insertions(+), 361 deletions(-)
+ 31 files changed, 1878 insertions(+), 375 deletions(-)
 
 diff --git a/kernel/Kbuild b/kernel/Kbuild
 index cec135d13..6cecbc733 100644
@@ -430,7 +430,7 @@ index 0cb3ffd02..434d46685 100644
  	if (ret) {
  		pr_info("avc_spoof/init: sid grab fail!\n");
 diff --git a/kernel/feature/adb_root.c b/kernel/feature/adb_root.c
-index c41a99559..ae3c017f9 100644
+index bcf93bc4d..a48236d95 100644
 --- a/kernel/feature/adb_root.c
 +++ b/kernel/feature/adb_root.c
 @@ -9,9 +9,15 @@
@@ -463,10 +463,10 @@ index c41a99559..ae3c017f9 100644
 +                susfs_ends_with(filename, "/adbd"));
 +}
 +#else
- static long is_exec_adbd(struct pt_regs *regs)
+ static long is_exec_adbd(const char __user *filename_user)
  {
      static const char kAdbd[] = "/adbd";
-@@ -44,8 +60,9 @@ static long is_exec_adbd(struct pt_regs *regs)
+@@ -43,8 +59,9 @@ static long is_exec_adbd(const char __user *filename_user)
  
      return 1;
  }
@@ -477,7 +477,7 @@ index c41a99559..ae3c017f9 100644
  {
      static const char kLibAdbRoot[] = "/data/adb/ksu/lib/libadbroot.so";
      struct path path;
-@@ -65,6 +82,101 @@ static long is_libadbroot_ok()
+@@ -64,6 +81,134 @@ static long is_libadbroot_ok()
      return ret;
  }
  
@@ -490,12 +490,12 @@ index c41a99559..ae3c017f9 100644
 +    static const size_t kPtrSize = sizeof(unsigned long);
 +    unsigned long stackp = current_user_stack_pointer();
 +    unsigned long envp, ld_preload_p, ld_library_path_p;
-+    unsigned long *envp_p = (unsigned long)envp_user_ptr;
++    unsigned long *envp_p = (unsigned long *)envp_user_ptr;
 +    unsigned long *tmp_env_p = NULL, *tmp_env_p2 = NULL;
 +    size_t env_count = 0, total_size;
 +    long ret;
 +
-+    envp = (char __user **)untagged_addr((unsigned long)*envp_p);
++    envp = (unsigned long)untagged_addr((unsigned long)*envp_p);
 +
 +    ld_preload_p = stackp = ALIGN_DOWN(stackp - sizeof(kLdPreload), 8);
 +    ret = copy_to_user((void __user *)ld_preload_p, kLdPreload, sizeof(kLdPreload));
@@ -550,8 +550,6 @@ index c41a99559..ae3c017f9 100644
 +            break;
 +    }
 +
-+    // We should have allocated enough memory
-+    // TODO: handle existing LD_PRELOAD
 +    tmp_env_p[env_count++] = ld_preload_p;
 +    tmp_env_p[env_count++] = ld_library_path_p;
 +    tmp_env_p[env_count++] = 0;
@@ -575,52 +573,7 @@ index c41a99559..ae3c017f9 100644
 +
 +    return ret;
 +}
-+#else
- static long setup_ld_preload(struct pt_regs *regs)
- {
-     static const char kLdPreload[] = "LD_PRELOAD=/data/adb/ksu/lib/libadbroot.so";
-@@ -81,14 +193,14 @@ static long setup_ld_preload(struct pt_regs *regs)
-     envp = (char __user **)untagged_addr((unsigned long)*envp_p);
- 
-     ld_preload_p = stackp = ALIGN_DOWN(stackp - sizeof(kLdPreload), 8);
--    ret = copy_to_user(ld_preload_p, kLdPreload, sizeof(kLdPreload));
-+    ret = copy_to_user((void __user *)ld_preload_p, kLdPreload, sizeof(kLdPreload));
-     if (ret != 0) {
-         pr_warn("write ld_preload when adb_root_handle_execve failed: %ld\n", ret);
-         return -EFAULT;
-     }
- 
-     ld_library_path_p = stackp = ALIGN_DOWN(stackp - sizeof(kLdLibraryPath), 8);
--    ret = copy_to_user(ld_library_path_p, kLdLibraryPath, sizeof(kLdLibraryPath));
-+    ret = copy_to_user((void __user *)ld_library_path_p, kLdLibraryPath, sizeof(kLdLibraryPath));
-     if (ret != 0) {
-         pr_warn("write ld_library_path when adb_root_handle_execve failed: %ld\n", ret);
-         return -EFAULT;
-@@ -102,7 +214,7 @@ static long setup_ld_preload(struct pt_regs *regs)
-             goto out_release_env_p;
-         }
-         tmp_env_p = tmp_env_p2;
--        ret = copy_from_user(&tmp_env_p[env_count], envp + env_count * kPtrSize, kReadEnvBatch * kPtrSize);
-+        ret = copy_from_user(&tmp_env_p[env_count], (void __user *)(envp + env_count * kPtrSize), kReadEnvBatch * kPtrSize);
-         if (ret < 0) {
-             pr_warn("Access envp when adb_root_handle_execve failed: %ld\n", ret);
-             ret = -EFAULT;
-@@ -141,7 +253,7 @@ static long setup_ld_preload(struct pt_regs *regs)
-     total_size = env_count * kPtrSize;
- 
-     stackp -= total_size;
--    ret = copy_to_user(stackp, tmp_env_p, total_size);
-+    ret = copy_to_user((void __user *)stackp, tmp_env_p, total_size);
-     if (ret != 0) {
-         pr_err("copy new env failed: %ld\n", ret);
-         ret = -EFAULT;
-@@ -158,7 +270,34 @@ out_release_env_p:
- 
-     return ret;
- }
-+#endif
 +
-+#ifdef CONFIG_KSU_SUSFS
 +static long do_ksu_adb_root_handle_execve(const char *filename, void ***envp_user_ptr)
 +{
 +    if (likely(is_exec_adbd(filename) != 1)) {
@@ -642,44 +595,90 @@ index c41a99559..ae3c017f9 100644
 +    ret = (long)escape_with_root_profile();
 +    if (ret)
 +        pr_err("escape_with_root_profile() failed: %d\n", (int)ret);
- 
++
 +    return 0;
 +}
-+#else
- static long do_ksu_adb_root_handle_execve(struct pt_regs *regs)
- {
-     if (likely(is_exec_adbd(regs) != 1)) {
-@@ -178,7 +317,17 @@ static long do_ksu_adb_root_handle_execve(struct pt_regs *regs)
-     escape_to_root_for_adb_root();
-     return 0;
- }
-+#endif
- 
-+#ifdef CONFIG_KSU_SUSFS
-+long ksu_adb_root_handle_execve(const char *filename, void ***envp_user_ptr)
++
++long ksu_adb_root_handle_execve(const char *filename, void __user ***envp_user_ptr)
 +{
 +    if (static_branch_unlikely(&ksu_adb_root)) {
-+        return do_ksu_adb_root_handle_execve(filename, envp_user_ptr);
++        return do_ksu_adb_root_handle_execve(filename, (void ***)envp_user_ptr);
 +    }
 +    return 0;
 +}
++
 +#else
- long ksu_adb_root_handle_execve(struct pt_regs *regs)
++
+ static long setup_ld_preload(struct pt_regs *regs, unsigned long *envp_p)
  {
-     if (static_branch_unlikely(&ksu_adb_root)) {
-@@ -186,6 +335,7 @@ long ksu_adb_root_handle_execve(struct pt_regs *regs)
+     static const char kLdPreload[] = "LD_PRELOAD=/data/adb/ksu/lib/libadbroot.so";
+@@ -76,17 +221,17 @@ static long setup_ld_preload(struct pt_regs *regs, unsigned long *envp_p)
+     size_t env_count = 0, total_size;
+     long ret;
+ 
+-    envp = (char __user **)untagged_addr((unsigned long)*envp_p);
++    envp = (unsigned long)untagged_addr((unsigned long)*envp_p);
+ 
+     ld_preload_p = stackp = ALIGN_DOWN(stackp - sizeof(kLdPreload), 8);
+-    ret = copy_to_user(ld_preload_p, kLdPreload, sizeof(kLdPreload));
++    ret = copy_to_user((void __user *)ld_preload_p, kLdPreload, sizeof(kLdPreload));
+     if (ret != 0) {
+         pr_warn("write ld_preload when adb_root_handle_execve failed: %ld\n", ret);
+         return -EFAULT;
+     }
+ 
+     ld_library_path_p = stackp = ALIGN_DOWN(stackp - sizeof(kLdLibraryPath), 8);
+-    ret = copy_to_user(ld_library_path_p, kLdLibraryPath, sizeof(kLdLibraryPath));
++    ret = copy_to_user((void __user *)ld_library_path_p, kLdLibraryPath, sizeof(kLdLibraryPath));
+     if (ret != 0) {
+         pr_warn("write ld_library_path when adb_root_handle_execve failed: %ld\n", ret);
+         return -EFAULT;
+@@ -100,7 +245,7 @@ static long setup_ld_preload(struct pt_regs *regs, unsigned long *envp_p)
+             goto out_release_env_p;
+         }
+         tmp_env_p = tmp_env_p2;
+-        ret = copy_from_user(&tmp_env_p[env_count], envp + env_count * kPtrSize, kReadEnvBatch * kPtrSize);
++        ret = copy_from_user(&tmp_env_p[env_count], (void __user *)(envp + env_count * kPtrSize), kReadEnvBatch * kPtrSize);
+         if (ret < 0) {
+             pr_warn("Access envp when adb_root_handle_execve failed: %ld\n", ret);
+             ret = -EFAULT;
+@@ -131,15 +276,13 @@ static long setup_ld_preload(struct pt_regs *regs, unsigned long *envp_p)
+             break;
+     }
+ 
+-    // We should have allocated enough memory
+-    // TODO: handle existing LD_PRELOAD
+     tmp_env_p[env_count++] = ld_preload_p;
+     tmp_env_p[env_count++] = ld_library_path_p;
+     tmp_env_p[env_count++] = 0;
+     total_size = env_count * kPtrSize;
+ 
+     stackp -= total_size;
+-    ret = copy_to_user(stackp, tmp_env_p, total_size);
++    ret = copy_to_user((void __user *)stackp, tmp_env_p, total_size);
+     if (ret != 0) {
+         pr_err("copy new env failed: %ld\n", ret);
+         ret = -EFAULT;
+@@ -194,13 +337,12 @@ long ksu_adb_root_handle_execveat(struct pt_regs *regs)
      }
      return 0;
  }
+-
 +#endif
- 
  static int kernel_adb_root_feature_get(u64 *value)
  {
+     *value = static_key_enabled(&ksu_adb_root) ? 1 : 0;
+     return 0;
+ }
+-
+ static int kernel_adb_root_feature_set(u64 value)
+ {
+     bool enable = value != 0;
 diff --git a/kernel/feature/adb_root.h b/kernel/feature/adb_root.h
-index 754dba232..5b9b855c2 100644
+index 154a466de..a0f5aca49 100644
 --- a/kernel/feature/adb_root.h
 +++ b/kernel/feature/adb_root.h
-@@ -2,7 +2,11 @@
+@@ -2,8 +2,12 @@
  #define __KSU_H_ADB_ROOT
  #include <asm/ptrace.h>
  
@@ -687,6 +686,7 @@ index 754dba232..5b9b855c2 100644
 +long ksu_adb_root_handle_execve(const char *filename, void __user ***envp_user_ptr);
 +#else
  long ksu_adb_root_handle_execve(struct pt_regs *regs);
+ long ksu_adb_root_handle_execveat(struct pt_regs *regs);
 +#endif
  
  void ksu_adb_root_init(void);
@@ -1065,10 +1065,10 @@ index 5a0437108..7932830b6 100644
 +
  #endif
 diff --git a/kernel/feature/sucompat.c b/kernel/feature/sucompat.c
-index 553cb6ae9..c43ee897e 100644
+index e9aab2209..dd84d95b1 100644
 --- a/kernel/feature/sucompat.c
 +++ b/kernel/feature/sucompat.c
-@@ -13,6 +13,19 @@
+@@ -14,6 +14,19 @@
  #include <linux/version.h>
  #include <linux/sched/task_stack.h>
  #include <linux/ptrace.h>
@@ -1088,7 +1088,7 @@ index 553cb6ae9..c43ee897e 100644
  
  #include "arch.h"
  #include "policy/allowlist.h"
-@@ -20,6 +33,7 @@
+@@ -21,6 +34,7 @@
  #include "klog.h" // IWYU pragma: keep
  #include "runtime/ksud.h"
  #include "feature/sucompat.h"
@@ -1096,7 +1096,7 @@ index 553cb6ae9..c43ee897e 100644
  #include "policy/app_profile.h"
  #include "hook/syscall_hook.h"
  #include "sulog/event.h"
-@@ -29,18 +43,28 @@
+@@ -30,18 +44,28 @@
  #define SU_PATH "/system/bin/su"
  #define SH_PATH "/system/bin/sh"
  
@@ -1128,7 +1128,7 @@ index 553cb6ae9..c43ee897e 100644
  	pr_info("su_compat: set to %d\n", enable);
  	return 0;
  }
-@@ -61,11 +85,18 @@ static void __user *userspace_stack_buffer(const void *d, size_t len)
+@@ -62,11 +86,18 @@ static void __user *userspace_stack_buffer(const void *d, size_t len)
  	return copy_to_user(p, d, len) ? NULL : p;
  }
  
@@ -1149,7 +1149,7 @@ index 553cb6ae9..c43ee897e 100644
  }
  
  static char __user *empty_user_path(void)
-@@ -73,8 +104,6 @@ static char __user *empty_user_path(void)
+@@ -74,8 +105,6 @@ static char __user *empty_user_path(void)
  	return userspace_stack_buffer("", sizeof(""));
  }
  
@@ -1158,7 +1158,7 @@ index 553cb6ae9..c43ee897e 100644
  static bool is_ksud_exists()
  {
  	struct path path;
-@@ -86,6 +115,305 @@ static bool is_ksud_exists()
+@@ -87,6 +116,305 @@ static bool is_ksud_exists()
  	return true;
  }
  
@@ -1464,7 +1464,7 @@ index 553cb6ae9..c43ee897e 100644
  long ksu_handle_faccessat_sucompat(int orig_nr, struct pt_regs *regs)
  {
  	const char __user **filename_user, *orig_filename;
-@@ -103,6 +431,10 @@ long ksu_handle_faccessat_sucompat(int orig_nr, struct pt_regs *regs)
+@@ -104,6 +432,10 @@ long ksu_handle_faccessat_sucompat(int orig_nr, struct pt_regs *regs)
  	strncpy_from_user_nofault(path, *filename_user, sizeof(path));
  
  	if (unlikely(!memcmp(path, su_path, sizeof(su_path)))) {
@@ -1475,7 +1475,7 @@ index 553cb6ae9..c43ee897e 100644
  		old_cred = override_creds(ksu_cred);
  		if (is_ksud_exists()) {
  			ksu_compat_sulog('a');
-@@ -139,6 +471,10 @@ long ksu_handle_stat_sucompat(int orig_nr, struct pt_regs *regs)
+@@ -140,6 +472,10 @@ long ksu_handle_stat_sucompat(int orig_nr, struct pt_regs *regs)
  	strncpy_from_user_nofault(path, *filename_user, sizeof(path));
  
  	if (unlikely(!memcmp(path, su_path, sizeof(su_path)))) {
@@ -1486,7 +1486,7 @@ index 553cb6ae9..c43ee897e 100644
  		old_cred = override_creds(ksu_cred);
  		if (is_ksud_exists()) {
  			ksu_compat_sulog('s');
-@@ -189,6 +525,11 @@ long ksu_handle_execve_sucompat(const char __user **filename_user, int orig_nr,
+@@ -194,6 +530,11 @@ static long ksu_handle_execve_sucompat_common(const char __user **filename_user,
  	if (likely(memcmp(path, su_path, sizeof(su_path))))
  		goto do_orig_execve;
  
@@ -1498,19 +1498,19 @@ index 553cb6ae9..c43ee897e 100644
  	ksu_compat_sulog('x');
  	pr_info("sys_execve su found\n");
  
-@@ -243,6 +584,7 @@ long ksu_handle_execve_sucompat(const char __user **filename_user, int orig_nr,
- do_orig_execve:
- 	return ksu_syscall_table[orig_nr](regs);
+@@ -260,6 +601,7 @@ long ksu_handle_execveat_sucompat(const char __user **filename_user, int orig_nr
+ 	return ksu_handle_execve_sucompat_common(filename_user, (const char __user *const __user *)PT_REGS_PARM3(regs),
+ 						 PT_REGS_SYSCALL_PARM4(regs), true, orig_nr, regs);
  }
 +#endif
  
  // sucompat: permitted process can execute 'su' to gain root access.
  void __init ksu_sucompat_init()
 diff --git a/kernel/feature/sucompat.h b/kernel/feature/sucompat.h
-index bd7cc21f4..1431557a4 100644
+index 5e2cfe11b..cf41f3212 100644
 --- a/kernel/feature/sucompat.h
 +++ b/kernel/feature/sucompat.h
-@@ -2,15 +2,34 @@
+@@ -2,16 +2,35 @@
  #define __KSU_H_SUCOMPAT
  #include <asm/ptrace.h>
  #include <linux/types.h>
@@ -1542,6 +1542,7 @@ index bd7cc21f4..1431557a4 100644
  long ksu_handle_faccessat_sucompat(int orig_nr, struct pt_regs *regs);
  long ksu_handle_stat_sucompat(int orig_nr, struct pt_regs *regs);
  long ksu_handle_execve_sucompat(const char __user **filename_user, int orig_nr, struct pt_regs *regs);
+ long ksu_handle_execveat_sucompat(const char __user **filename_user, int orig_nr, struct pt_regs *regs);
 +#endif
 +#endif
  
@@ -1690,10 +1691,10 @@ index 3a3dfea8e..d5ab04236 100644
  
  #endif
 diff --git a/kernel/hook/syscall_event_bridge.c b/kernel/hook/syscall_event_bridge.c
-index a961321b4..e1ead915d 100644
+index 48ab764db..9fcd5f3ee 100644
 --- a/kernel/hook/syscall_event_bridge.c
 +++ b/kernel/hook/syscall_event_bridge.c
-@@ -45,61 +45,61 @@ static int ksu_handle_init_mark_tracker(const char __user **filename_user)
+@@ -45,70 +45,70 @@ static int ksu_handle_init_mark_tracker(const char __user **filename_user)
          ksu_clear_task_tracepoint_flag_if_needed(current);
      }
  
@@ -1731,28 +1732,37 @@ index a961321b4..e1ead915d 100644
 +	static_branch_disable(&ksud_execve_key);
  }
  
- long __nocfi ksu_hook_execve(int orig_nr, const struct pt_regs *regs)
+ static long __nocfi ksu_hook_execve_common(int orig_nr, const struct pt_regs *regs, bool execveat)
  {
--    const char __user **filename_user = (const char __user **)&PT_REGS_PARM1(regs);
--    const char __user *const __user *argv_user = (const char __user *const __user *)PT_REGS_PARM2(regs);
+-    const char __user **filename_user =
+-        execveat ? (const char __user **)&PT_REGS_PARM2(regs) : (const char __user **)&PT_REGS_PARM1(regs);
+-    const char __user *const __user *argv_user = execveat ? (const char __user *const __user *)PT_REGS_PARM3(regs) :
+-                                                            (const char __user *const __user *)PT_REGS_PARM2(regs);
 -    bool current_is_init = is_init(current_cred());
 -    struct ksu_sulog_pending_event *pending_root_execve = NULL;
 -    long ret;
 -
--    if (static_branch_unlikely(&ksud_execve_key))
--        ksu_execve_hook_ksud(regs);
+-    if (static_branch_unlikely(&ksud_execve_key)) {
+-        if (execveat) {
+-            ksu_execveat_hook_ksud(regs);
+-        } else {
+-            ksu_execve_hook_ksud(regs);
+-        }
+-    }
 -
 -    if (current_euid().val == 0)
 -        pending_root_execve = ksu_sulog_capture_root_execve(*filename_user, argv_user, GFP_KERNEL);
 -
 -    if (current->pid != 1 && current_is_init) {
 -        ksu_handle_init_mark_tracker(filename_user);
--        ret = ksu_adb_root_handle_execve((struct pt_regs *)regs);
+-        ret = execveat ? ksu_adb_root_handle_execveat((struct pt_regs *)regs) :
+-                         ksu_adb_root_handle_execve((struct pt_regs *)regs);
 -        if (ret) {
 -            pr_err("adb root failed: %ld\n", ret);
 -        }
 -    } else if (ksu_su_compat_enabled) {
--        ret = ksu_handle_execve_sucompat(filename_user, orig_nr, (struct pt_regs *)regs);
+-        ret = execveat ? ksu_handle_execveat_sucompat(filename_user, orig_nr, (struct pt_regs *)regs) :
+-                         ksu_handle_execve_sucompat(filename_user, orig_nr, (struct pt_regs *)regs);
 -        ksu_sulog_emit_pending(pending_root_execve, ret, GFP_KERNEL);
 -        return ret;
 -    }
@@ -1760,26 +1770,35 @@ index a961321b4..e1ead915d 100644
 -    ret = ksu_syscall_table[orig_nr](regs);
 -    ksu_sulog_emit_pending(pending_root_execve, ret, GFP_KERNEL);
 -    return ret;
-+	const char __user **filename_user = (const char __user **)&PT_REGS_PARM1(regs);
-+	const char __user *const __user *argv_user = (const char __user *const __user *)PT_REGS_PARM2(regs);
++	const char __user **filename_user =
++		execveat ? (const char __user **)&PT_REGS_PARM2(regs) : (const char __user **)&PT_REGS_PARM1(regs);
++	const char __user *const __user *argv_user = execveat ? (const char __user *const __user *)PT_REGS_PARM3(regs) :
++								(const char __user *const __user *)PT_REGS_PARM2(regs);
 +	bool current_is_init = is_init(current_cred());
 +	struct ksu_sulog_pending_event *pending_root_execve = NULL;
 +	long ret;
 +
-+	if (static_branch_unlikely(&ksud_execve_key))
-+		ksu_execve_hook_ksud(regs);
++	if (static_branch_unlikely(&ksud_execve_key)) {
++		if (execveat) {
++			ksu_execveat_hook_ksud(regs);
++		} else {
++			ksu_execve_hook_ksud(regs);
++		}
++	}
 +
 +	if (current_euid().val == 0)
 +		pending_root_execve = ksu_sulog_capture_root_execve(*filename_user, argv_user, GFP_KERNEL);
 +
 +	if (current->pid != 1 && current_is_init) {
 +		ksu_handle_init_mark_tracker(filename_user);
-+		ret = ksu_adb_root_handle_execve((struct pt_regs *)regs);
++		ret = execveat ? ksu_adb_root_handle_execveat((struct pt_regs *)regs) :
++				 ksu_adb_root_handle_execve((struct pt_regs *)regs);
 +		if (ret) {
 +			pr_err("adb root failed: %ld\n", ret);
 +		}
 +	} else if (static_branch_likely(&ksu_su_compat_enabled)) {
-+		ret = ksu_handle_execve_sucompat(filename_user, orig_nr, (struct pt_regs *)regs);
++		ret = execveat ? ksu_handle_execveat_sucompat(filename_user, orig_nr, (struct pt_regs *)regs) :
++				 ksu_handle_execve_sucompat(filename_user, orig_nr, (struct pt_regs *)regs);
 +		ksu_sulog_emit_pending(pending_root_execve, ret, GFP_KERNEL);
 +		return ret;
 +	}
@@ -1789,8 +1808,8 @@ index a961321b4..e1ead915d 100644
 +	return ret;
  }
  
- long __nocfi ksu_hook_setresuid(int orig_nr, const struct pt_regs *regs)
-@@ -110,6 +110,10 @@ long __nocfi ksu_hook_setresuid(int orig_nr, const struct pt_regs *regs)
+ long __nocfi ksu_hook_execve(int orig_nr, const struct pt_regs *regs)
+@@ -129,6 +129,10 @@ long __nocfi ksu_hook_setresuid(int orig_nr, const struct pt_regs *regs)
      if (ret < 0)
          return ret;
  
@@ -2180,15 +2199,16 @@ index eed9047d1..7e064f36c 100644
  void on_module_mounted(void)
  {
 diff --git a/kernel/runtime/ksud.h b/kernel/runtime/ksud.h
-index 62cfaabf2..2285e8931 100644
+index 09384deff..c7ab9dcef 100644
 --- a/kernel/runtime/ksud.h
 +++ b/kernel/runtime/ksud.h
-@@ -8,7 +8,27 @@
+@@ -8,8 +8,28 @@
  void ksu_ksud_init();
  void ksu_ksud_exit();
  
 +void ksu_handle_sys_read(unsigned int fd, char __user **buf_ptr, size_t *count_ptr);
  void ksu_execve_hook_ksud(const struct pt_regs *regs);
+ void ksu_execveat_hook_ksud(const struct pt_regs *regs);
  void ksu_stop_input_hook_runtime(void);
  
 +#define MAX_ARG_STRINGS 0x7FFFFFFF
@@ -2212,7 +2232,7 @@ index 62cfaabf2..2285e8931 100644
 +
  #endif
 diff --git a/kernel/runtime/ksud_integration.c b/kernel/runtime/ksud_integration.c
-index 38d1476f1..9976a28cd 100644
+index 5bf84cb66..335963259 100644
 --- a/kernel/runtime/ksud_integration.c
 +++ b/kernel/runtime/ksud_integration.c
 @@ -29,6 +29,16 @@
@@ -2506,7 +2526,7 @@ index 38d1476f1..9976a28cd 100644
  
      pr_info("volumedown_pressed_count: %d\n", volumedown_pressed_count);
      if (is_volumedown_enough(volumedown_pressed_count)) {
-@@ -542,17 +645,20 @@ void ksu_execve_hook_ksud(const struct pt_regs *regs)
+@@ -540,7 +643,11 @@ static void ksu_execve_hook_ksud_common(const char __user *filename_user, const
          return;
      }
  
@@ -2515,6 +2535,11 @@ index 38d1476f1..9976a28cd 100644
 +#else
      ksu_handle_execveat_ksud(path, &argv);
 +#endif
+ }
+ 
+ void ksu_execve_hook_ksud(const struct pt_regs *regs)
+@@ -559,14 +666,13 @@ void ksu_execveat_hook_ksud(const struct pt_regs *regs)
+     ksu_execve_hook_ksud_common(filename_user, argv_user);
  }
  
 +#ifndef CONFIG_KSU_SUSFS
@@ -2530,7 +2555,7 @@ index 38d1476f1..9976a28cd 100644
      return orig_sys_read(regs);
  }
  
-@@ -631,10 +737,12 @@ void ksu_stop_input_hook_runtime(void)
+@@ -645,10 +751,12 @@ void ksu_stop_input_hook_runtime(void)
      bool ret = schedule_work(&stop_input_hook_work);
      pr_info("unregister input kprobe: %d!\n", ret);
  }
@@ -2543,7 +2568,7 @@ index 38d1476f1..9976a28cd 100644
      int ret;
  
      ksu_syscall_table_hook(__NR_read, ksu_sys_read, &orig_sys_read);
-@@ -644,14 +752,17 @@ void __init ksu_ksud_init()
+@@ -658,14 +766,17 @@ void __init ksu_ksud_init()
      pr_info("ksud: input_event_kp: %d\n", ret);
  
      INIT_WORK(&stop_input_hook_work, do_stop_input_hook);
