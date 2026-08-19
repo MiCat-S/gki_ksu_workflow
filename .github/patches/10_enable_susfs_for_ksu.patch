@@ -1,5 +1,5 @@
 From: midori01 <lv@lvlv.lv>
-Date: Tue, 18 Aug 2026 15:00:00 +0900
+Date: Wed, 19 Aug 2026 16:00:00 +0900
 Subject: [PATCH] Enable SUSFS for MidoriSU-KO
 
 ---
@@ -10,9 +10,9 @@ Subject: [PATCH] Enable SUSFS for MidoriSU-KO
  kernel/feature/adb_root.h         |   3 +-
  kernel/feature/kernel_umount.c    |  24 --
  kernel/feature/selinux_hide.c     | 418 ++++--------------------------
- kernel/feature/sucompat.c         | 404 ++++++++++++++---------------
- kernel/feature/sucompat.h         |  15 +-
- kernel/hook/setuid_hook.c         |  71 +++--
+ kernel/feature/sucompat.c         | 385 +++++++++++++--------------
+ kernel/feature/sucompat.h         |  14 +-
+ kernel/hook/setuid_hook.c         |  79 ++++--
  kernel/hook/setuid_hook.h         |   3 -
  kernel/include/ksu.h              |   1 -
  kernel/policy/allowlist.c         |   8 -
@@ -29,7 +29,7 @@ Subject: [PATCH] Enable SUSFS for MidoriSU-KO
  kernel/supercall/dispatch.c       | 176 ++++++++-----
  kernel/supercall/supercall.c      |  53 ++--
  kernel/supercall/supercall.h      |   1 +
- 26 files changed, 813 insertions(+), 1119 deletions(-)
+ 26 files changed, 799 insertions(+), 1121 deletions(-)
 
 diff --git a/kernel/Kbuild b/kernel/Kbuild
 index a69ac83e9..18c25f2cb 100644
@@ -1138,7 +1138,7 @@ index 5bb59bfe4..1a2c32445 100644
      } else {
          context_struct_compute_av(policydb, scontext, tcontext, tclass, avd, NULL);
 diff --git a/kernel/feature/sucompat.c b/kernel/feature/sucompat.c
-index 73c012713..bf795ba85 100644
+index 73c012713..983364bd3 100644
 --- a/kernel/feature/sucompat.c
 +++ b/kernel/feature/sucompat.c
 @@ -1,6 +1,3 @@
@@ -1205,7 +1205,7 @@ index 73c012713..bf795ba85 100644
      pr_info("su_compat: set to %d\n", enable);
      return 0;
  }
-@@ -64,254 +76,242 @@ static void __user *userspace_stack_buffer(const void *d, size_t len)
+@@ -64,254 +76,221 @@ static void __user *userspace_stack_buffer(const void *d, size_t len)
      return copy_to_user(p, d, len) ? NULL : p;
  }
  
@@ -1213,17 +1213,17 @@ index 73c012713..bf795ba85 100644
 +static char __user *sh_user_path(void)
  {
 -    static const char ksud_path[] = KSUD_PATH;
-+    static const char sh_path[] = "/system/bin/sh";
- 
+-
 -    return userspace_stack_buffer(ksud_path, sizeof(ksud_path));
-+    return userspace_stack_buffer(sh_path, sizeof(sh_path));
- }
+-}
++    static const char sh_path[] = "/system/bin/sh";
  
 -static char __user *empty_user_path(void)
 -{
 -    return userspace_stack_buffer("", sizeof(""));
--}
--
++    return userspace_stack_buffer(sh_path, sizeof(sh_path));
+ }
+ 
 -static const char su_path[] = SU_PATH;
 -
 -static bool is_ksud_exists()
@@ -1272,29 +1272,29 @@ index 73c012713..bf795ba85 100644
 -
 -	if (likely((buf & 0x00FFFFFFFFFFFFFFUL) != (su_p[1] & 0x00FFFFFFFFFFFFFFUL)))
 -		return false;
--
++    const char __user *native;
+ 
 -#else
 -	if (get_user(buf, &fn_p[3]))
 -		return false;
 -
 -	if (likely((buf & 0x00FFFFFFUL) != (su_p[3] & 0x00FFFFFFUL)))
 -		return false;
-+    const char __user *native;
- 
+-
 -	if (unlikely(get_user(buf, &fn_p[2])))
+-		return false;
+-
+-	if (buf != su_p[2])
 -		return false;
 +#ifdef CONFIG_COMPAT
 +    if (unlikely(argv.is_compat)) {
 +        compat_uptr_t compat;
  
--	if (buf != su_p[2])
+-	if (unlikely(get_user(buf, &fn_p[1])))
 -		return false;
 +        if (get_user(compat, argv.ptr.compat + nr))
 +            return ERR_PTR(-EFAULT);
  
--	if (unlikely(get_user(buf, &fn_p[1])))
--		return false;
--
 -	if (unlikely(buf != su_p[1]))
 -		return false;
 +        return compat_ptr(compat);
@@ -1391,7 +1391,10 @@ index 73c012713..bf795ba85 100644
 -        goto do_orig_stat;
 +    if (likely(!strstr(filename->name, "/app_process") && !strstr(filename->name, "/adbd") && !strstr(filename->name, "/stub_zygote"))) {
 +        pr_info("susfs: mark no sucompat checks for pid: '%d', exec: '%s'\n", current->pid, filename->name);
-+        susfs_set_current_proc_umounted();
++        susfs_set_current_proc_no_su();
++        // - marking proc umounted here is useless because only zygote spawned processes will umount
++        //   the sus mounts, tho other susfs features still rely on proc_umounted check, but
++        //   it is fine to not spoof for init spawned processes.
 +        return 0;
      }
  
@@ -1439,7 +1442,7 @@ index 73c012713..bf795ba85 100644
  {
 -    const char __user *fn;
 +    struct filename *filename;
-+    const char __user *argv_user_ptr = get_user_arg_ptr(*((struct user_arg_ptr*)argv_user), 0);
++    const char __user *argv_user_ptr;
 +    struct ksu_sulog_pending_event *pending_root = NULL;
      struct ksu_sulog_pending_event *pending_sucompat = NULL;
 -    char path[sizeof(su_path) + 1];
@@ -1479,6 +1482,7 @@ index 73c012713..bf795ba85 100644
 -        pr_err("alloc tmp fd err: %d\n", tmp_fd);
 -        goto do_orig_execve;
 +    if (likely(memcmp(filename->name, su_path, sizeof(su_path)))) {
++        argv_user_ptr = get_user_arg_ptr(*((struct user_arg_ptr*)argv_user), 0);
 +        if (!argv_user_ptr || IS_ERR(argv_user_ptr))
 +            return 0;
 +        pending_root = ksu_sulog_capture_root_execve(filename->name, (struct user_arg_ptr*)argv_user, GFP_KERNEL);
@@ -1515,9 +1519,9 @@ index 73c012713..bf795ba85 100644
 -    regs->__PT_PARM1_REG = tmp_fd;
 +    write_sulog('x');
 +    pr_info("ksu_handle_execveat_sucompat: su found\n");
- 
-+    memcpy((void *)filename->name, ksud_path, sizeof(ksud_path));
 +
++    memcpy((void *)filename->name, ksud_path, sizeof(ksud_path));
+ 
 +    pending_root = ksu_sulog_capture_root_execve(filename->name, (struct user_arg_ptr*)argv_user, GFP_KERNEL);
 +    pending_sucompat = ksu_sulog_capture_sucompat(filename->name, (struct user_arg_ptr*)argv_user, GFP_KERNEL);
      ret = escape_with_root_profile();
@@ -1526,6 +1530,7 @@ index 73c012713..bf795ba85 100644
 +    if (ret)
 +        pr_err("escape_with_root_profile() failed: %d\n", ret);
 +
++    argv_user_ptr = get_user_arg_ptr(*((struct user_arg_ptr*)argv_user), 0);
 +    if (!argv_user_ptr || IS_ERR(argv_user_ptr)) {
 +        pr_err("!argv_user_ptr || IS_ERR(argv_user_ptr)\n");
 +        ksu_sulog_emit_pending(pending_root, ret, GFP_KERNEL);
@@ -1563,31 +1568,32 @@ index 73c012713..bf795ba85 100644
  }
  
 -long ksu_handle_execve_sucompat(const char __user **filename_user, int orig_nr, struct pt_regs *regs)
-+int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
++int ksu_handle_faccessat(int *dfd, struct filename **filename, int *mode,
 +             int *__unused_flags)
  {
 -    return ksu_handle_execve_sucompat_common(filename_user, (const char __user *const __user *)PT_REGS_PARM2(regs),
 -                                             PT_REGS_PARM3(regs), false, orig_nr, regs);
-+    char path[sizeof(su_path) + 1] = {0};
++    if (unlikely(IS_ERR(*filename) || (*filename)->name == NULL))
++        return 0;
 +
-+    strncpy_from_user(path, *filename_user, sizeof(path));
++    if (likely(memcmp((*filename)->name, su_path, sizeof(su_path))))
++        return 0;
 +
-+    if (unlikely(!memcmp(path, su_path, sizeof(su_path)))) {
-+        if (current_chrooted())
-+        {
-+            pr_err("ksu_handle_faccessat: su found but NOT allowed! Because current process is running in chrooted environment\n");
-+            return 0;
-+        }
-+        write_sulog('a');
-+        pr_info("ksu_handle_faccessat: su->sh!\n");
-+        *filename_user = sh_user_path();
++    if (current_chrooted())
++    {
++        pr_err("ksu_handle_faccessat: su found but NOT allowed! Because current process is running in chrooted environment\n");
++        return 0;
 +    }
-+
++    write_sulog('a');
++    pr_info("ksu_handle_faccessat: su->sh!\n");
++    memcpy((void *)((*filename)->name), sh_path, sizeof(sh_path));
 +    return 0;
  }
  
 -long ksu_handle_execveat_sucompat(const char __user **filename_user, int orig_nr, struct pt_regs *regs)
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+-{
+-    return ksu_handle_execve_sucompat_common(filename_user, (const char __user *const __user *)PT_REGS_PARM3(regs),
+-                                             PT_REGS_SYSCALL_PARM4(regs), true, orig_nr, regs);
 +int ksu_handle_stat(int *dfd, struct filename **filename, int *flags) {
 +    if (unlikely(IS_ERR(*filename) || (*filename)->name == NULL))
 +        return 0;
@@ -1604,33 +1610,7 @@ index 73c012713..bf795ba85 100644
 +    pr_info("ksu_handle_stat: su->sh!\n");
 +    memcpy((void *)((*filename)->name), sh_path, sizeof(sh_path));
 +    return 0;
-+}
-+#else
-+int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
- {
--    return ksu_handle_execve_sucompat_common(filename_user, (const char __user *const __user *)PT_REGS_PARM3(regs),
--                                             PT_REGS_SYSCALL_PARM4(regs), true, orig_nr, regs);
-+    if (unlikely(!filename_user))
-+        return 0;
-+
-+    char path[sizeof(su_path) + 1] = {0};
-+
-+    strncpy_from_user(path, *filename_user, sizeof(path));
-+
-+    if (unlikely(!memcmp(path, su_path, sizeof(su_path)))) {
-+        if (current_chrooted())
-+        {
-+            pr_err("ksu_handle_stat: su found but NOT allowed! Because current process is running in chrooted environment\n");
-+            return 0;
-+        }
-+        write_sulog('s');
-+        pr_info("ksu_handle_stat: su->sh!\n");
-+        *filename_user = sh_user_path();
-+    }
-+
-+    return 0;
  }
-+#endif // #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
  
  // sucompat: permitted process can execute 'su' to gain root access.
  void __init ksu_sucompat_init()
@@ -1643,10 +1623,10 @@ index 73c012713..bf795ba85 100644
  
  void __exit ksu_sucompat_exit()
 diff --git a/kernel/feature/sucompat.h b/kernel/feature/sucompat.h
-index 5e2cfe11b..1d8da95a0 100644
+index 5e2cfe11b..a4a6a7de3 100644
 --- a/kernel/feature/sucompat.h
 +++ b/kernel/feature/sucompat.h
-@@ -3,15 +3,18 @@
+@@ -3,15 +3,15 @@
  #include <asm/ptrace.h>
  #include <linux/types.h>
  
@@ -1656,24 +1636,22 @@ index 5e2cfe11b..1d8da95a0 100644
  void ksu_sucompat_init(void);
  void ksu_sucompat_exit(void);
  
- // Handler functions exported for hook_manager
+-// Handler functions exported for hook_manager
 -long ksu_handle_faccessat_sucompat(int orig_nr, struct pt_regs *regs);
 -long ksu_handle_stat_sucompat(int orig_nr, struct pt_regs *regs);
 -long ksu_handle_execve_sucompat(const char __user **filename_user, int orig_nr, struct pt_regs *regs);
 -long ksu_handle_execveat_sucompat(const char __user **filename_user, int orig_nr, struct pt_regs *regs);
-+int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *__unused_flags);
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0) && defined(CONFIG_KSU_SUSFS)
++int ksu_handle_faccessat(int *dfd, struct filename **filename, int *mode, int *__unused_flags);
 +int ksu_handle_stat(int *dfd, struct filename **filename, int *flags);
-+#else
-+int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
-+#endif // #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0) && defined(CONFIG_KSU_SUSFS)
-+long ksu_handle_execve_sucompat(const char __user **filename_user, int orig_nr, const struct pt_regs *regs);
++int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
++                 void *argv_user, void *envp_user,
++                 int *__never_use_flags);
  
 -#endif
 +#endif
 \ No newline at end of file
 diff --git a/kernel/hook/setuid_hook.c b/kernel/hook/setuid_hook.c
-index d3f3ac49e..ca509c229 100644
+index d3f3ac49e..e8a068db9 100644
 --- a/kernel/hook/setuid_hook.c
 +++ b/kernel/hook/setuid_hook.c
 @@ -11,6 +11,8 @@
@@ -1685,7 +1663,7 @@ index d3f3ac49e..ca509c229 100644
  
  #include "policy/allowlist.h"
  #include "hook/setuid_hook.h"
-@@ -18,39 +20,66 @@
+@@ -18,39 +20,74 @@
  #include "manager/manager_identity.h"
  #include "infra/seccomp_cache.h"
  #include "supercall/supercall.h"
@@ -1719,11 +1697,14 @@ index d3f3ac49e..ca509c229 100644
 -        ksu_set_task_tracepoint_flag(current);
 -        spin_unlock_irq(&current->sighand->siglock);
 +    // Check if spawned process is isolated service first, and force to do umount if so
-+    if (is_isolated_process(ruid))
++    if (is_isolated_process(ruid)) {
++        susfs_set_current_proc_no_su();
++        susfs_set_current_proc_umounted();
 +        goto do_umount;
++    }
  
 -        pr_info("install fd for manager: %d\n", new_uid);
-+    // - Since ksu manager app uid is excluded in allow_list_arr, so ksu_uid_should_umount(manager_uid)
++    // - Since ksu maanger app uid is excluded in allow_list_arr, so ksu_uid_should_umount(manager_uid)
 +    //   will always return true, that's why we need to explicitly check if new_uid belongs to
 +    //   ksu manager.
 +    // - Disable seccomp restriction for KSU manager since running with "su" will disable seccomp anyway
@@ -1744,17 +1725,27 @@ index d3f3ac49e..ca509c229 100644
 -    } else {
 -        ksu_clear_task_tracepoint_flag_if_needed(current);
 +    // we should not umount for webview zygote
-+    if (unlikely(ruid == WEBVIEW_ZYGOTE_UID))
++    if (unlikely(ruid == WEBVIEW_ZYGOTE_UID)) {
++        susfs_set_current_proc_no_su();
 +        return 0;
++    }
 +
 +    // Check if spawned process is normal user app and needs to be umounted
-+    if (likely(is_appuid(ruid) && ksu_uid_should_umount(ruid)))
++    if (likely(is_appuid(ruid) && ksu_uid_should_umount(ruid))) {
++        susfs_set_current_proc_no_su();
++        susfs_set_current_proc_umounted();
 +        goto do_umount;
++    }
 +
 +    // - Disable seccomp restriction for root allowed apps since running with "su" will disable seccomp anyway
-+    if (ksu_is_allow_uid_for_current(ruid))
++    if (ksu_is_allow_uid_for_current(ruid)) {
 +        disable_seccomp();
-+
++        return 0;
+     }
+ 
+-    // Handle kernel umount
+-    ksu_handle_umount(old_uid, new_uid);
++    susfs_set_current_proc_no_su();
 +    return 0;
 +
 +do_umount:
@@ -1764,12 +1755,7 @@ index d3f3ac49e..ca509c229 100644
 +
 +        // Handle extra susfs work
 +        ksu_handle_extra_susfs_work();
-     }
- 
--    // Handle kernel umount
--    ksu_handle_umount(old_uid, new_uid);
-+    // Mark current proc as umounted
-+    susfs_set_current_proc_umounted();
++    }
  
      return 0;
  }
@@ -2612,7 +2598,7 @@ index 635ec01cf..901833619 100644
  int ksu_sulog_emit_grant_root(int retval, __u32 uid, __u32 euid, gfp_t gfp);
  
 diff --git a/kernel/supercall/dispatch.c b/kernel/supercall/dispatch.c
-index 39d9f486c..3361590ac 100644
+index 39d9f486c..61fdc10e4 100644
 --- a/kernel/supercall/dispatch.c
 +++ b/kernel/supercall/dispatch.c
 @@ -4,6 +4,8 @@
@@ -2714,7 +2700,7 @@ index 39d9f486c..3361590ac 100644
 -            pr_err("manage_mark: get failed for pid %d: %d\n", cmd.pid, ret);
 -            return ret;
 +        case KSU_MARK_GET: {
-+            if (susfs_is_current_proc_umounted()) {
++            if (susfs_is_current_proc_no_su()) {
 +                ret = 0; // SYSCALL_TRACEPOINT is NOT flagged
 +            } else {
 +                ret = 1; // SYSCALL_TRACEPOINT is flagged

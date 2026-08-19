@@ -6,13 +6,13 @@
     "revisions": {
       "172": {
         "asb_date": "2026-06",
-        "default_r": "r6",
+        "default_r": "r7",
         "supported_r": [
-          "r6",
+          "r7",
           "none"
         ],
-        "commit": "e5bd51fda5b4a426109058d3606419285acac6d3",
-        "commit_date": "2026-08-07 03:26:45 -0700"
+        "commit": "b99c6818d6272386711698202c74d839f508ac9e",
+        "commit_date": "2026-08-18 18:40:20 -0700"
       },
       "176": {
         "asb_date": "lts",
@@ -20,8 +20,8 @@
         "supported_r": [
           "r00"
         ],
-        "commit": "64167cbd57a9816c14eaab6b4f8c2180d6ee82c3",
-        "commit_date": "2026-08-06 09:18:36 +0000"
+        "commit": "2002d05f9030ded299033aae4e7cdfcf444a03c9",
+        "commit_date": "2026-08-17 15:00:58 +0000"
       }
     },
     "default_clang": "r487747c",
@@ -100,8 +100,8 @@
         "supported_r": [
           "r00"
         ],
-        "commit": "7ea470bd893a834184a51cbb4f5cc8255eb771e7",
-        "commit_date": "2026-08-15 11:34:16 +0000"
+        "commit": "60fa207718d18741232ab49a7f10760f1f90aa99",
+        "commit_date": "2026-08-17 13:47:15 +0000"
       }
     },
     "default_clang": "r536225",
