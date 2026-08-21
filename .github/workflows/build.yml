@@ -29,13 +29,13 @@ on:
         type: choice
         options:
           - all
-          - MidoriSU-KO
+          - MidoriSU-KX
           - MidoriSU-NX
-          - MidoriSU-OG
-          - MidoriSU-RE
+          - MidoriSU-OX
+          - MidoriSU-RX
           - MidoriSU-XX
-      midorisu_ko_branch:
-        description: 'MidoriSU-KO Source'
+      midorisu_kx_branch:
+        description: 'MidoriSU-KX Source'
         required: true
         default: 'KOWX712/KernelSU:master'
         type: choice
@@ -50,16 +50,16 @@ on:
         options:
           - 'KernelSU-Next/KernelSU-Next:dev'
           - 'midori01/KernelSU:next'
-      midorisu_og_branch:
-        description: 'MidoriSU-OG Source'
+      midorisu_ox_branch:
+        description: 'MidoriSU-OX Source'
         required: true
         default: 'tiann/KernelSU:main'
         type: choice
         options:
           - 'tiann/KernelSU:main'
           - 'midori01/KernelSU:official'
-      midorisu_re_branch:
-        description: 'MidoriSU-RE Source'
+      midorisu_rx_branch:
+        description: 'MidoriSU-RX Source'
         required: true
         default: 'ReSukiSU/ReSukiSU:main'
         type: choice
@@ -287,10 +287,10 @@ jobs:
                 matrix=$(echo "$matrix" | jq -c --arg kv "$kv" --arg sub_level "$sub_level" --arg variant "$v" --argjson ds "$ds" --argjson sus "$sus" '.include += [{"kernel_version":$kv,"sub_level":$sub_level,"variant":$variant,"droidspaces":$ds,"susfs":$sus}]')
               }
 
-              [[ "$variant" =~ ^(all|MidoriSU-KO)$ ]] && add_variant MidoriSU-KO true
+              [[ "$variant" =~ ^(all|MidoriSU-KX)$ ]] && add_variant MidoriSU-KX true
               [[ "$variant" =~ ^(all|MidoriSU-NX)$ ]] && add_variant MidoriSU-NX true
-              [[ "$variant" =~ ^(all|MidoriSU-OG)$ ]] && add_variant MidoriSU-OG true
-              [[ "$variant" =~ ^(all|MidoriSU-RE)$ ]] && add_variant MidoriSU-RE true
+              [[ "$variant" =~ ^(all|MidoriSU-OX)$ ]] && add_variant MidoriSU-OX true
+              [[ "$variant" =~ ^(all|MidoriSU-RX)$ ]] && add_variant MidoriSU-RX true
               [[ "$variant" =~ ^(all|MidoriSU-XX)$ ]] && add_variant MidoriSU-XX true
             done
           done < /tmp/kvs.txt
@@ -330,10 +330,10 @@ jobs:
       build_timestamp: ${{ needs.setup.outputs.build_timestamp }}
       build_user: ${{ inputs.build_user }}
       build_host: ${{ inputs.build_host }}
-      midorisu_ko_branch: ${{ inputs.midorisu_ko_branch }}
+      midorisu_kx_branch: ${{ inputs.midorisu_kx_branch }}
       midorisu_nx_branch: ${{ inputs.midorisu_nx_branch }}
-      midorisu_og_branch: ${{ inputs.midorisu_og_branch }}
-      midorisu_re_branch: ${{ inputs.midorisu_re_branch }}
+      midorisu_ox_branch: ${{ inputs.midorisu_ox_branch }}
+      midorisu_rx_branch: ${{ inputs.midorisu_rx_branch }}
       midorisu_xx_branch: ${{ inputs.midorisu_xx_branch }}
       hook_mode: ${{ needs.setup.outputs.hook_mode_val }}
       ksu_debug: ${{ inputs.ksu_debug }}
@@ -477,10 +477,10 @@ jobs:
           fi
           rekernel_line "Re:Kernel" commit_info/rekernel_commit
           rekernel_x_line "Re:Kernel-X" commit_info/rekernel_x_commit
-          ksu_line MidoriSU-KO "$(cat commit_info/midorisu_ko_ksu_repo 2>/dev/null)" commit_info/midorisu_ko_ksu_commit
+          ksu_line MidoriSU-KX "$(cat commit_info/midorisu_kx_ksu_repo 2>/dev/null)" commit_info/midorisu_kx_ksu_commit
           ksu_line MidoriSU-NX "$(cat commit_info/midorisu_nx_ksu_repo 2>/dev/null)" commit_info/midorisu_nx_ksu_commit
-          ksu_line MidoriSU-OG "$(cat commit_info/midorisu_og_ksu_repo 2>/dev/null)" commit_info/midorisu_og_ksu_commit
-          ksu_line MidoriSU-RE "$(cat commit_info/midorisu_re_ksu_repo 2>/dev/null)" commit_info/midorisu_re_ksu_commit
+          ksu_line MidoriSU-OX "$(cat commit_info/midorisu_ox_ksu_repo 2>/dev/null)" commit_info/midorisu_ox_ksu_commit
+          ksu_line MidoriSU-RX "$(cat commit_info/midorisu_rx_ksu_repo 2>/dev/null)" commit_info/midorisu_rx_ksu_commit
           ksu_line MidoriSU-XX "$(cat commit_info/midorisu_xx_ksu_repo 2>/dev/null)" commit_info/midorisu_xx_ksu_commit
 
       - name: Publish Release
@@ -491,10 +491,10 @@ jobs:
           make_latest: ${{ matrix.kv == '6.12' || !contains(needs.setup.outputs.kernel_versions, ',') }}
           body: |
             ${{ env.KERNEL_SOURCE_INFO }}
-            ${{ steps.ksu_info.outputs.midorisu-ko }}
+            ${{ steps.ksu_info.outputs.midorisu-kx }}
             ${{ steps.ksu_info.outputs.midorisu-nx }}
-            ${{ steps.ksu_info.outputs.midorisu-og }}
-            ${{ steps.ksu_info.outputs.midorisu-re }}
+            ${{ steps.ksu_info.outputs.midorisu-ox }}
+            ${{ steps.ksu_info.outputs.midorisu-rx }}
             ${{ steps.ksu_info.outputs.midorisu-xx }}
             ${{ steps.ksu_info.outputs.susfs_url && format('- **SUSFS4KSU**: [{0}]({1}) {2}', steps.ksu_info.outputs.susfs_commit, steps.ksu_info.outputs.susfs_url, steps.ksu_info.outputs.susfs_date) || '' }}
             ${{ steps.ksu_info.outputs.rekernel_line }}

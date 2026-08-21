@@ -16,7 +16,7 @@ inputs:
     required: false
     default: '0'
   variant:
-    description: 'KSU variant (MidoriSU-KO, MidoriSU-XX, MidoriSU-RE, etc.)'
+    description: 'KSU variant (MidoriSU-KX, MidoriSU-XX, MidoriSU-RX, etc.)'
     required: true
   hook_mode:
     description: 'Hook mode'
@@ -27,7 +27,7 @@ inputs:
     required: false
     default: 'false'
   enable_susfs:
-    description: 'Set to "true" to inject SuSFS configs'
+    description: 'Set to "true" to inject SUSFS configs'
     required: false
     default: 'false'
   use_droidspaces:
@@ -108,7 +108,7 @@ runs:
         EOF
             fi
             ;;
-          MidoriSU-RE)
+          MidoriSU-RX)
             if [ "${{ inputs.enable_susfs }}" = "true" ]; then
               cat >> $DEFCONFIG <<-'EOF'
         CONFIG_KSU_TOOLKIT_SUPPORT=y
