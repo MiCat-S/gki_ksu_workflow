@@ -26,6 +26,10 @@ on:
       use_susfs:
         required: true
         type: boolean
+      susfs_repo:
+        required: false
+        type: string
+        default: 'GitLab'
       midorisu_kx_branch:
         required: false
         type: string
@@ -263,7 +267,7 @@ jobs:
         working-directory: kernel_workspace/common
         env:
           SUSFS_DIR: ${{ github.workspace }}/susfs4ksu
-          SUSFS_REPO: https://gitlab.com/simonpunk/susfs4ksu
+          SUSFS_REPO: ${{ inputs.susfs_repo == 'GitHub' && 'https://github.com/midori01/susfs4ksu' || 'https://gitlab.com/simonpunk/susfs4ksu' }}
           SUSFS_COMMIT: ${{ inputs.susfs_commit }}
           KMI_VERSION: ${{ steps.cfg.outputs.kmi_version }}
         run: |
@@ -378,6 +382,7 @@ jobs:
               pushd "${{ github.workspace }}/susfs4ksu" > /dev/null
               git rev-parse HEAD > "$COMMIT_DIR/susfs_commit"
               git log -1 --format=%cd --date=format:'%Y-%m-%d %H:%M %z' HEAD > "$COMMIT_DIR/susfs_date"
+              echo "${{ inputs.susfs_repo }}" > "$COMMIT_DIR/susfs_repo"
               popd > /dev/null
             fi
           }

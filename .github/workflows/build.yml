@@ -81,9 +81,9 @@ on:
         default: 'hookless (XX only)'
         type: choice
         options:
-          - 'manual (XX & RE)'
+          - 'manual (XX & RX)'
           - 'hookless (XX only)'
-          - 'tracepoint (RE only)'
+          - 'tracepoint (RX only)'
       ksu_debug:
         description: 'KernelSU Debug'
         required: true
@@ -119,6 +119,14 @@ on:
         required: true
         default: true
         type: boolean
+      susfs_repo:
+        description: 'SUSFS Repository'
+        required: false
+        default: 'GitLab'
+        type: choice
+        options:
+          - GitLab
+          - GitHub
       susfs_commit:
         description: 'SUSFS Commit Hash (Leave blank for latest)'
         required: false
@@ -299,9 +307,9 @@ jobs:
           echo "build_matrix=$matrix" >> $GITHUB_OUTPUT
 
           case "${{ inputs.hook_mode }}" in
-            'manual (XX & RE)') hook_mode_val="manual" ;;
+            'manual (XX & RX)') hook_mode_val="manual" ;;
             'hookless (XX only)') hook_mode_val="hookless" ;;
-            'tracepoint (RE only)') hook_mode_val="tracepoint" ;;
+            'tracepoint (RX only)') hook_mode_val="tracepoint" ;;
             *) hook_mode_val="manual" ;;
           esac
           echo "hook_mode_val=$hook_mode_val" >> $GITHUB_OUTPUT
@@ -321,6 +329,7 @@ jobs:
       use_rekernel: ${{ inputs.use_rekernel }}
       unicode_bypass_fix: ${{ inputs.unicode_bypass_fix }}
       use_susfs: ${{ matrix.susfs }}
+      susfs_repo: ${{ inputs.susfs_repo }}
       source_mirror: ${{ inputs.source_mirror }}
       use_ccache: ${{ inputs.use_ccache }}
       susfs_commit: ${{ inputs.susfs_commit }}
@@ -469,7 +478,11 @@ jobs:
           if [ -f "commit_info/susfs_commit" ]; then
             sha=$(cat commit_info/susfs_commit)
             out "susfs_commit=\`$(short_sha commit_info/susfs_commit)\`"
-            out "susfs_url=https://gitlab.com/simonpunk/susfs4ksu/-/commit/$sha"
+            if [ "${{ inputs.susfs_repo }}" = "GitHub" ]; then
+              out "susfs_url=https://github.com/midori01/susfs4ksu/commit/$sha"
+            else
+              out "susfs_url=https://gitlab.com/simonpunk/susfs4ksu/-/commit/$sha"
+            fi
             out "susfs_date=\`$(cat commit_info/susfs_date)\`"
           fi
           if [ -f "commit_info/driver_version" ]; then

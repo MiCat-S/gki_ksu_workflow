@@ -1,6 +1,6 @@
 From: midori01 <lv@lvlv.lv>
 Date: Mon, 27 Jul 2026 19:51:16 +0900
-Subject: [PATCH] SUSFS inline hooks for gki-android16-6.12-2026-03
+Subject: [PATCH] SUSFS de-inlined hooks for gki-android16-6.12-2026-03
 
 ---
  drivers/input/input.c |   3 +
