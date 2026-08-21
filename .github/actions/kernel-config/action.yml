@@ -27,7 +27,7 @@ inputs:
     required: false
     default: 'false'
   enable_susfs:
-    description: 'Set to "true" to inject SuSFS configs'
+    description: 'Set to "true" to inject SUSFS configs'
     required: false
     default: 'false'
   use_droidspaces:
