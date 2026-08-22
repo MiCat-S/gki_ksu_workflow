@@ -52,7 +52,7 @@ fi
 sed -i '/^ccflags-y.*KSU_KERNEL_DIR/c\ccflags-y += -I$(srctree)/$(src) -I$(srctree)/$(src)/include -I$(src) -I$(src)/include' KernelSU/kernel/Kbuild 2>/dev/null || true
 sed -i "s|^ccflags-y += -DKSU_VERSION=.*|ccflags-y += -DKSU_VERSION=${KSU_VERSION}|" KernelSU/kernel/Kbuild 2>/dev/null || true
 sed -i "s|^CFLAGS_ksu\.o += -DKSU_VERSION=.*|CFLAGS_ksu.o += -DKSU_VERSION=${KSU_VERSION}|" KernelSU/kernel/Makefile 2>/dev/null || true
-sed -i "s|^REPO_NAME := .*|REPO_NAME := MidoriRE|" KernelSU/kernel/Kbuild 2>/dev/null || true
+sed -i "s|^REPO_NAME := .*|REPO_NAME := MidoriSU|" KernelSU/kernel/Kbuild 2>/dev/null || true
 sed -i 's|^\(\s*default "%TAG_NAME%\).*|\1-midori-build@%REPO_NAME%"|' KernelSU/kernel/Kconfig 2>/dev/null || true
 
 echo "[+] KernelSU setup complete."

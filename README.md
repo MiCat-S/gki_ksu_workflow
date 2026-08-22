@@ -114,3 +114,28 @@ All kernel version-specific settings are centralized in [`.github/config/kernel_
 | **LZ4/Zstd zram backends** | Optionally updates the kernel's LZ4 and Zstd implementations from the official LZ4 1.10.0 and Zstandard 1.5.7 releases, with zram backend support enabled for kernel 6.12. Controlled by the `use_lz4_zstd` toggle; 6.1 and 6.6 builds remain unchanged. |
 | **Ccache** | Compiler cache integration with a 60-second wait guard for dependency installation, ensuring robust accelerated incremental rebuilds across workflow runs. |
 | **Spoofed Build Metadata** | Customizable `kernel name`, `build timestamp`, `user`, and `host` strings for the compiled image. |
+
+---
+
+## ✅ Tested Devices
+
+The following devices have been confirmed to work with kernels built by this workflow:
+
+| Brand | Model |
+| :--- | :--- |
+| Google | Pixel 7/8/9/10 series (Tensor) |
+| Xiaomi | Xiaomi 17 series (Snapdragon) |
+| Xiaomi | REDMI K90 Pro Max (Snapdragon) |
+| Tecno | Tecno Camon 40 Pro 4G (Helio) |
+
+> [!NOTE]
+> **Compatibility Notes:**
+> - All listed devices run Android 16+ with GKI kernels (6.1/6.6/6.12)
+> - SUSFS and Droidspaces features have been tested on all device families
+> - Users on stock ROMs are advised to flash the kernel via MidoriSU Manager or Kernel Flasher
+
+> [!TIP]
+> **Have a device not listed?**  
+> If you've successfully tested a kernel on your device, feel free to open an issue or pull request to have it added to this list!
+
+---

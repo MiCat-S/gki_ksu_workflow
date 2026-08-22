@@ -114,3 +114,28 @@
 | **LZ4/Zstd zram 后端** | 可选将内核中的 LZ4 和 Zstd 实现更新为官方 LZ4 1.10.0 与 Zstandard 1.5.7 版本，并为 kernel 6.12 启用 zram 后端。通过 `use_lz4_zstd` 开关控制；6.1 和 6.6 构建保持不变。 |
 | **Ccache** | 编译器缓存集成，带有 60 秒等待守卫以确保依赖安装，保证跨工作流运行的健壮加速增量重建。 |
 | **伪装构建元数据** | 可为编译镜像自定义 `kernel name`、`build timestamp`、`user` 和 `host` 字符串。 |
+
+---
+
+## ✅ 已测试设备
+
+以下设备已确认可使用本工作流构建的内核：
+
+| 品牌 | 型号 |
+| :--- | :--- |
+| Google | Pixel 7/8/9/10 系列 (Tensor) |
+| Xiaomi | Xiaomi 17 系列 (Snapdragon) |
+| Xiaomi | REDMI K90 Pro Max (Snapdragon) |
+| Tecno | Tecno Camon 40 Pro 4G (Helio) |
+
+> [!NOTE]
+> **兼容性说明：**
+> - 以上设备均运行 Android 16+，搭载 GKI 内核（6.1/6.6/6.12）
+> - SUSFS 与 Droidspaces 功能已在所有设备系列上完成测试
+> - 原厂系统用户建议通过 MidoriSU 管理器或 Kernel Flasher 刷入内核
+
+> [!TIP]
+> **你的设备不在列表中？**  
+> 如果你已在其他设备上成功测试内核，欢迎提交 Issue 或 Pull Request 将其加入列表！
+
+---

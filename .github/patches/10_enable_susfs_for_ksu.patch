@@ -1,5 +1,5 @@
 From: midori01 <lv@lvlv.lv>
-Date: Fri, 21 Aug 2026 13:20:34 +0900
+Date: Sun, 23 Aug 2026 07:00:00 +0900
 Subject: [PATCH] Enable SUSFS for MidoriSU-KX
 
 ---
@@ -12,7 +12,7 @@ Subject: [PATCH] Enable SUSFS for MidoriSU-KX
  kernel/feature/selinux_hide.c     | 418 ++++--------------------------
  kernel/feature/sucompat.c         | 385 +++++++++++++--------------
  kernel/feature/sucompat.h         |  14 +-
- kernel/hook/setuid_hook.c         |  79 ++++--
+ kernel/hook/setuid_hook.c         | 147 +++++++++--
  kernel/hook/setuid_hook.h         |   3 -
  kernel/include/ksu.h              |   1 -
  kernel/policy/allowlist.c         |   8 -
@@ -22,14 +22,14 @@ Subject: [PATCH] Enable SUSFS for MidoriSU-KX
  kernel/runtime/ksud.h             |  18 +-
  kernel/runtime/ksud_integration.c | 262 ++++++-------------
  kernel/selinux/rules.c            |   2 +
- kernel/selinux/selinux.c          |  82 ++++++
- kernel/selinux/selinux.h          |   8 +
+ kernel/selinux/selinux.c          |  89 +++++++
+ kernel/selinux/selinux.h          |   9 +
  kernel/sulog/event.c              |  56 ++--
  kernel/sulog/event.h              |  10 +-
  kernel/supercall/dispatch.c       | 176 ++++++++-----
  kernel/supercall/supercall.c      |  53 ++--
  kernel/supercall/supercall.h      |   1 +
- 26 files changed, 799 insertions(+), 1162 deletions(-)
+ 26 files changed, 875 insertions(+), 1162 deletions(-)
 
 diff --git a/kernel/Kbuild b/kernel/Kbuild
 index a69ac83e9..18c25f2cb 100644
@@ -1652,7 +1652,7 @@ index 5e2cfe11b..a4a6a7de3 100644
 +#endif
 \ No newline at end of file
 diff --git a/kernel/hook/setuid_hook.c b/kernel/hook/setuid_hook.c
-index d3f3ac49e..726be04b5 100644
+index d3f3ac49e..f14e24f14 100644
 --- a/kernel/hook/setuid_hook.c
 +++ b/kernel/hook/setuid_hook.c
 @@ -11,6 +11,8 @@
@@ -1664,7 +1664,7 @@ index d3f3ac49e..726be04b5 100644
  
  #include "policy/allowlist.h"
  #include "hook/setuid_hook.h"
-@@ -18,39 +20,74 @@
+@@ -18,41 +20,144 @@
  #include "manager/manager_identity.h"
  #include "infra/seccomp_cache.h"
  #include "supercall/supercall.h"
@@ -1673,6 +1673,7 @@ index d3f3ac49e..726be04b5 100644
  
 -int ksu_handle_setresuid(uid_t old_uid, uid_t new_uid)
 +extern u32 susfs_zygote_sid;
++extern u32 susfs_zygote_next_sid;
 +extern void disable_seccomp(void);
 +extern struct work_struct susfs_extra_works;
 +
@@ -1681,22 +1682,17 @@ index d3f3ac49e..726be04b5 100644
 -    // we rely on the fact that zygote always call setresuid(3) with same uids
 +    if (work_pending(&susfs_extra_works))
 +        return;
-+
-+    schedule_work(&susfs_extra_works);
-+}
  
 -    pr_info("handle_setresuid from %d to %d\n", old_uid, new_uid);
-+int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
-+{
-+    // We only interest in process spwaned by zygote
-+    if (!susfs_is_sid_equal(current_cred(), susfs_zygote_sid))
-+        return 0;
++    schedule_work(&susfs_extra_works);
++}
  
 -    if (unlikely(is_uid_manager(new_uid))) {
 -        spin_lock_irq(&current->sighand->siglock);
 -        ksu_seccomp_allow_cache(current->seccomp.filter, __NR_reboot);
 -        ksu_set_task_tracepoint_flag(current);
 -        spin_unlock_irq(&current->sighand->siglock);
++static int handle_zygote_setresuid(uid_t ruid) {
 +    // Check if spawned process is isolated service first, and force to do umount if so
 +    if (is_isolated_process(ruid)) {
 +        susfs_set_current_proc_no_su();
@@ -1736,18 +1732,18 @@ index d3f3ac49e..726be04b5 100644
 +        susfs_set_current_proc_no_su();
 +        susfs_set_current_proc_umounted();
 +        goto do_umount;
-+    }
-+
-+    // - Disable seccomp restriction for root allowed apps since running with "su" will disable seccomp anyway
-+    if (ksu_is_allow_uid_for_current(ruid)) {
-+        disable_seccomp();
-+        return 0;
      }
  
 -    // Handle kernel umount
 -    ksu_handle_umount(old_uid, new_uid);
++    // - Disable seccomp restriction for root allowed apps since running with "su" will disable seccomp anyway
++    if (ksu_is_allow_uid_for_current(ruid)) {
++        disable_seccomp();
++        return 0;
++    }
+ 
 +    susfs_set_current_proc_no_su();
-+    return 0;
+     return 0;
 +
 +do_umount:
 +    {
@@ -1757,9 +1753,83 @@ index d3f3ac49e..726be04b5 100644
 +        // Handle extra susfs work
 +        ksu_handle_extra_susfs_work();
 +    }
- 
-     return 0;
++
++    return 0;
++}
++
++static int handle_zygote_next_setresuid(uid_t ruid) {
++    // Check if spawned process is isolated service first, and force to do umount if so
++    if (is_isolated_process(ruid)) {
++        susfs_set_current_proc_no_su();
++        susfs_set_current_proc_umounted();
++        susfs_set_current_proc_umounted_for_zygote_next();
++        goto do_susfs_work;
++    }
++
++    // - Since ksu manager app uid is excluded in allow_list_arr, so ksu_uid_should_umount(manager_uid)
++    //   will always return true, that's why we need to explicitly check if new_uid belongs to
++    //   ksu manager.
++    // - Disable seccomp restriction for KSU manager since running with "su" will disable seccomp anyway
++    if (likely(ksu_is_manager_appid_valid()) && unlikely(is_uid_manager(ruid))) {
++        disable_seccomp();
++        pr_info("install fd for manager: %d\n", ruid);
++        ksu_install_fd();
++        return 0;
++    }
++
++    // we should not umount for webview zygote
++    if (unlikely(ruid == WEBVIEW_ZYGOTE_UID)) {
++        susfs_set_current_proc_no_su();
++        return 0;
++    }
++
++    // Check if spawned process is normal user app and needs to be umounted
++    if (likely(is_appuid(ruid) && ksu_uid_should_umount(ruid))) {
++        susfs_set_current_proc_no_su();
++        susfs_set_current_proc_umounted();
++        susfs_set_current_proc_umounted_for_zygote_next();
++        goto do_susfs_work;
++    }
++
++    // - Disable seccomp restriction for root allowed apps since running with "su" will disable seccomp anyway
++    if (ksu_is_allow_uid_for_current(ruid)) {
++        disable_seccomp();
++        return 0;
++    }
++
++    susfs_set_current_proc_no_su();
++    return 0;
++
++do_susfs_work:
++    {
++        // Do not umount here as we are in init namespace now
++
++        // Handle extra susfs work
++        ksu_handle_extra_susfs_work();
++    }
++
++    return 0;
++}
++
++int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
++{
++    uid_t cur_uid = current_uid().val;
++
++    if (cur_uid != 0)
++        return 0;
++
++    // We only interest in process spwaned by zygote or zygote_next
++    if (susfs_is_sid_equal(current_cred(), susfs_zygote_sid))
++        return handle_zygote_setresuid(ruid);
++
++    if (susfs_is_sid_equal(current_cred(), susfs_zygote_next_sid))
++        return handle_zygote_next_setresuid(ruid);
++
++    return 0;
++
  }
+ 
+ void __init ksu_setuid_hook_init(void)
 diff --git a/kernel/hook/setuid_hook.h b/kernel/hook/setuid_hook.h
 index 3a3dfea8e..b84862386 100644
 --- a/kernel/hook/setuid_hook.h
@@ -2403,21 +2473,23 @@ index 762a7c555..250676f39 100644
      mutex_unlock(&selinux_state.policy_mutex);
  }
 diff --git a/kernel/selinux/selinux.c b/kernel/selinux/selinux.c
-index 7bc6d6d0d..dda45d8b5 100644
+index 7bc6d6d0d..3b0fcb3d3 100644
 --- a/kernel/selinux/selinux.c
 +++ b/kernel/selinux/selinux.c
-@@ -220,3 +220,85 @@ void escape_to_root_for_adb_root(void)
+@@ -220,3 +220,92 @@ void escape_to_root_for_adb_root(void)
      }
      commit_creds(cred);
  }
 +
 +#define KERNEL_INIT_DOMAIN "u:r:init:s0"
 +#define KERNEL_ZYGOTE_DOMAIN "u:r:zygote:s0"
++#define KERNEL_ZYGOTE_NEXT_DOMAIN "u:r:zygote_next:s0"
 +#define KERNEL_PRIV_APP_DOMAIN "u:r:priv_app:s0:c512,c768"
 +
 +u32 susfs_ksu_sid __read_mostly = 0;
 +u32 susfs_init_sid __read_mostly = 0;
 +u32 susfs_zygote_sid __read_mostly = 0;
++u32 susfs_zygote_next_sid __read_mostly = 0;
 +u32 susfs_priv_app_sid __read_mostly = 0;
 +
 +static inline void susfs_set_sid(const char *secctx_name, u32 *out_sid)
@@ -2477,6 +2549,10 @@ index 7bc6d6d0d..dda45d8b5 100644
 +    return unlikely(current_sid() == susfs_zygote_sid);
 +}
 +
++bool susfs_is_current_zygote_next_domain(void) {
++    return unlikely(current_sid() == susfs_zygote_next_sid);
++}
++
 +bool susfs_is_current_ksu_domain(void) {
 +    return unlikely(current_sid() == susfs_ksu_sid);
 +}
@@ -2488,15 +2564,16 @@ index 7bc6d6d0d..dda45d8b5 100644
 +void susfs_set_batch_sid(void)
 +{
 +    susfs_set_sid(KERNEL_ZYGOTE_DOMAIN, &susfs_zygote_sid);
++    susfs_set_sid(KERNEL_ZYGOTE_NEXT_DOMAIN, &susfs_zygote_next_sid);
 +    susfs_set_sid(KERNEL_SU_CONTEXT, &susfs_ksu_sid);
 +    susfs_set_sid(KERNEL_INIT_DOMAIN, &susfs_init_sid);
 +    susfs_set_sid(KERNEL_PRIV_APP_DOMAIN, &susfs_priv_app_sid);
 +}
 diff --git a/kernel/selinux/selinux.h b/kernel/selinux/selinux.h
-index a17ed226b..2e7f0020d 100644
+index a17ed226b..c8db3ceab 100644
 --- a/kernel/selinux/selinux.h
 +++ b/kernel/selinux/selinux.h
-@@ -39,4 +39,12 @@ void escape_to_root_for_adb_root();
+@@ -39,4 +39,13 @@ void escape_to_root_for_adb_root();
  
  extern u32 ksu_file_sid;
  
@@ -2505,6 +2582,7 @@ index a17ed226b..2e7f0020d 100644
 +u32 susfs_get_current_sid(void);
 +void susfs_set_batch_sid(void);
 +bool susfs_is_current_zygote_domain(void);
++bool susfs_is_current_zygote_next_domain(void);
 +bool susfs_is_current_ksu_domain(void);
 +bool susfs_is_current_init_domain(void);
 +
