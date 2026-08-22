@@ -114,11 +114,6 @@ on:
         required: true
         default: true
         type: boolean
-      unicode_bypass_fix:
-        description: 'Unicode Bypass Fix'
-        required: true
-        default: true
-        type: boolean
       build_scene_hider:
         description: 'eBPF Scene Hider'
         required: true
@@ -338,7 +333,6 @@ jobs:
       variant: ${{ matrix.variant }}
       use_droidspaces: ${{ matrix.droidspaces }}
       use_rekernel: ${{ inputs.use_rekernel }}
-      unicode_bypass_fix: ${{ inputs.unicode_bypass_fix }}
       use_adios: ${{ inputs.use_adios }}
       use_lz4_zstd: ${{ inputs.use_lz4_zstd }}
       use_susfs: ${{ matrix.susfs }}
@@ -530,7 +524,7 @@ jobs:
             - **Spoofed Uname**: `${{ matrix.kv }}.${{ env.UNAME_SUB }}${{ needs.setup.outputs.kernel_localversion }}`
             - **Spoofed Build Time**: `${{ needs.setup.outputs.build_timestamp }}`
             - **Spoofed Builder**: `${{ needs.setup.outputs.build_user }}@${{ needs.setup.outputs.build_host }}`
-            - **Unicode Bypass Fix**: ${{ inputs.unicode_bypass_fix && '✅' || '❌' }}　**Ccache Speedup**: ${{ inputs.use_ccache && '✅' || '❌' }}　**ADIOS 3.2.0**: ${{ inputs.use_adios && matrix.kv == '6.12' && '✅' || '❌' }}　**LZ4 1.10.0 / Zstd 1.5.7**: ${{ inputs.use_lz4_zstd && matrix.kv == '6.12' && '✅' || '❌' }}
+            - **Unicode Bypass Fix**: ✅　**Ccache Speedup**: ${{ inputs.use_ccache && '✅' || '❌' }}　**ADIOS 3.2.0**: ${{ inputs.use_adios && matrix.kv == '6.12' && '✅' || '❌' }}　**LZ4 1.10.0 / Zstd 1.5.7**: ${{ inputs.use_lz4_zstd && matrix.kv == '6.12' && '✅' || '❌' }}
             - **CVE-2026-43499 Fix**: ${{ matrix.kv == '6.12' && '✅' || 'N/A' }}
             - **Droidspaces**: ${{ inputs.use_droidspaces && '✅' || '❌' }}　**NTSync**: ${{ inputs.use_droidspaces && '✅' || '❌' }}　**TMPFS**: ✅
             - **TCP BBR**: ✅　**IPSET**: ✅　**Enhanced NAT**: ✅
