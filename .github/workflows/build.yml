@@ -142,15 +142,10 @@ on:
         required: false
         default: ''
         type: string
-      build_user:
-        description: 'Spoof Build User'
+      build_user_host:
+        description: 'Spoof Builder (user@host)'
         required: true
-        default: 'midori'
-        type: string
-      build_host:
-        description: 'Spoof Build Host'
-        required: true
-        default: 'build-host'
+        default: 'midori@build-host'
         type: string
       release_type:
         description: 'Release Type'
@@ -187,6 +182,8 @@ jobs:
       kernel_localversion: ${{ steps.config.outputs.kernel_localversion }}
       build_timestamp: ${{ steps.config.outputs.build_timestamp }}
       build_epoch: ${{ steps.config.outputs.build_epoch }}
+      build_user: ${{ steps.config.outputs.build_user }}
+      build_host: ${{ steps.config.outputs.build_host }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -222,6 +219,10 @@ jobs:
           fi
           echo "build_timestamp=$build_ts" >> $GITHUB_OUTPUT
           echo "build_epoch=$build_ep" >> $GITHUB_OUTPUT
+
+          IFS='@' read -r build_user build_host <<< "${{ inputs.build_user_host }}"
+          echo "build_user=$build_user" >> $GITHUB_OUTPUT
+          echo "build_host=$build_host" >> $GITHUB_OUTPUT
 
           rm -f /tmp/metadata.json
           echo "$kvs" | jq -r '.[]' > /tmp/kvs.txt
@@ -337,8 +338,8 @@ jobs:
       kernel_localversion: ${{ needs.setup.outputs.kernel_localversion }}
       build_epoch: ${{ needs.setup.outputs.build_epoch }}
       build_timestamp: ${{ needs.setup.outputs.build_timestamp }}
-      build_user: ${{ inputs.build_user }}
-      build_host: ${{ inputs.build_host }}
+      build_user: ${{ needs.setup.outputs.build_user }}
+      build_host: ${{ needs.setup.outputs.build_host }}
       midorisu_kx_branch: ${{ inputs.midorisu_kx_branch }}
       midorisu_nx_branch: ${{ inputs.midorisu_nx_branch }}
       midorisu_ox_branch: ${{ inputs.midorisu_ox_branch }}
@@ -516,7 +517,7 @@ jobs:
             - **Manager**: `${{ env.MIDORISU_APK }}`
             - **Spoofed Uname**: `${{ matrix.kv }}.${{ env.UNAME_SUB }}${{ needs.setup.outputs.kernel_localversion }}`
             - **Spoofed Build Time**: `${{ needs.setup.outputs.build_timestamp }}`
-            - **Spoofed Builder**: `${{ inputs.build_user }}@${{ inputs.build_host }}`
+            - **Spoofed Builder**: `${{ needs.setup.outputs.build_user }}@${{ needs.setup.outputs.build_host }}`
             - **Unicode Bypass Fix**: ${{ inputs.unicode_bypass_fix && '✅' || '❌' }}　**Ccache Speedup**: ${{ inputs.use_ccache && '✅' || '❌' }}
             - **Droidspaces**: ${{ inputs.use_droidspaces && '✅' || '❌' }}　**NTSync**: ${{ inputs.use_droidspaces && '✅' || '❌' }}　**TMPFS**: ✅
             - **TCP BBR**: ✅　**IPSET**: ✅　**Enhanced NAT**: ✅
