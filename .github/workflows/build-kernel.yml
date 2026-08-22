@@ -19,10 +19,6 @@ on:
         required: false
         type: boolean
         default: true
-      unicode_bypass_fix:
-        required: false
-        type: boolean
-        default: false
       use_susfs:
         required: true
         type: boolean
@@ -64,6 +60,14 @@ on:
         required: false
         type: boolean
         default: true
+      use_adios:
+        required: false
+        type: boolean
+        default: false
+      use_lz4_zstd:
+        required: false
+        type: boolean
+        default: false
       susfs_commit:
         required: false
         type: string
@@ -94,7 +98,9 @@ jobs:
     env:
       DS_SUFFIX: ${{ inputs.use_droidspaces && '-DS' || '' }}
       SUSFS_SUFFIX: ${{ inputs.use_susfs && '-SUSFS' || '' }}
-      CCACHE_DIR: ${{ github.workspace }}/.ccache-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}
+      ADIOS_SUFFIX: ${{ inputs.use_adios && inputs.kernel_version == '6.12' && '-ADIOS' || '' }}
+      ZRAM_SUFFIX: ${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-LZ4ZSTD' || '' }}
+      CCACHE_DIR: ${{ github.workspace }}/.ccache-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && inputs.kernel_version == '6.12' && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}
       CCACHE_COMPILERCHECK: content
       CCACHE_SLOPPINESS: file_macro,time_macros,include_file_mtime,include_file_ctime
 
@@ -136,9 +142,9 @@ jobs:
         id: cache-restore
         uses: ./.github/actions/restore-cache-retry
         with:
-          path: .ccache-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}
-          key: ${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ steps.cfg.outputs.asb_date }}${{ steps.cfg.outputs.r_suffix }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}-${{ github.run_id }}
-          restore-keys: ${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ steps.cfg.outputs.asb_date }}${{ steps.cfg.outputs.r_suffix }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}-
+          path: .ccache-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && inputs.kernel_version == '6.12' && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}
+          key: ${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ steps.cfg.outputs.asb_date }}${{ steps.cfg.outputs.r_suffix }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && inputs.kernel_version == '6.12' && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}-${{ github.run_id }}
+          restore-keys: ${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ steps.cfg.outputs.asb_date }}${{ steps.cfg.outputs.r_suffix }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && inputs.kernel_version == '6.12' && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}-
 
       - name: Setup Ccache Wrappers
         if: inputs.use_ccache
@@ -214,6 +220,49 @@ jobs:
           rm -f common/android/abi_gki_protected_exports_* || true
           sed -i 's/ -dirty//g' common/scripts/setlocalversion || true
           sed -i ':a; /#ifdef USE_PKCS11_ENGINE/{N;N;s/#ifdef USE_PKCS11_ENGINE\n\(.*\)\n#endif/\1/; ta}' common/certs/extract-cert.c || true
+
+      - name: Apply LZ4 1.10.0 and Zstd 1.5.7
+        if: inputs.use_lz4_zstd && inputs.kernel_version == '6.12'
+        working-directory: kernel_workspace/common
+        run: |
+          patch --batch --forward -p1 < "${{ github.workspace }}/.github/patches/zram/lz4-1.10.0.patch"
+          patch --batch --forward -p1 < "${{ github.workspace }}/.github/patches/zram/zstd-1.5.7.patch"
+
+      - name: Report LZ4/Zstd Compatibility
+        if: inputs.use_lz4_zstd && inputs.kernel_version != '6.12'
+        run: echo "::warning::LZ4 1.10.0 and Zstd 1.5.7 patches are supported only for kernel 6.12; this build will continue without them."
+
+      - name: Apply CVE-2026-43499 Fix
+        if: inputs.kernel_version == '6.12'
+        working-directory: kernel_workspace/common
+        run: |
+          RTMUTEX="kernel/locking/rtmutex.c"
+          RTMUTEX_API="kernel/locking/rtmutex_api.c"
+          PATCH_DIR="${{ github.workspace }}/.github/patches/android16-6.12"
+
+          if grep -Fq 'struct task_struct *waiter_task = waiter->task;' "$RTMUTEX"; then
+            echo "CVE-2026-43499 primary fix already present."
+          else
+            patch -p1 --forward < "$PATCH_DIR/cve-2026-43499-rtmutex.patch"
+          fi
+
+          has_null_guard=false
+          has_proxy_guard=false
+          grep -Fq 'if (!waiter_task) /* never enqueued */' "$RTMUTEX" && has_null_guard=true
+          grep -Fq 'if (unlikely(ret < 0))' "$RTMUTEX_API" && has_proxy_guard=true
+
+          if $has_null_guard && $has_proxy_guard; then
+            echo "CVE-2026-43499 follow-up fix already present."
+          elif ! $has_null_guard && ! $has_proxy_guard; then
+            patch -p1 --forward < "$PATCH_DIR/cve-2026-43499-followup.patch"
+          else
+            echo "::error::Incomplete CVE-2026-43499 follow-up state detected."
+            exit 1
+          fi
+
+          grep -Fq 'struct task_struct *waiter_task = waiter->task;' "$RTMUTEX"
+          grep -Fq 'if (!waiter_task) /* never enqueued */' "$RTMUTEX"
+          grep -Fq 'if (unlikely(ret < 0))' "$RTMUTEX_API"
 
       - name: Setup KernelSU
         working-directory: kernel_workspace/common
@@ -347,10 +396,19 @@ jobs:
           echo "RKX_VERSION=v$REKERNEL_X_TAG" >> $GITHUB_ENV
 
       - name: Apply Unicode Bypass Fix
-        if: inputs.unicode_bypass_fix
         working-directory: kernel_workspace/common
         run: |
           patch -p1 < "${{ github.workspace }}/.github/patches/unicode_bypass_fix_6.1+.patch"
+
+      - name: Apply ADIOS 3.2.0 I/O Scheduler
+        if: inputs.use_adios && inputs.kernel_version == '6.12'
+        working-directory: kernel_workspace/common
+        run: |
+          patch -p1 --forward --fuzz=3 < "${{ github.workspace }}/.github/patches/adios.patch"
+
+      - name: Report ADIOS Compatibility
+        if: inputs.use_adios && inputs.kernel_version != '6.12'
+        run: echo "::warning::ADIOS 3.2.0 is supported only for kernel 6.12; this build will continue without ADIOS."
 
       - name: Inject Kernel Configs
         uses: ./.github/actions/kernel-config
@@ -364,6 +422,8 @@ jobs:
           localversion: ${{ inputs.kernel_localversion }}
           use_droidspaces: ${{ inputs.use_droidspaces }}
           use_rekernel: ${{ inputs.use_rekernel }}
+          use_adios: ${{ inputs.use_adios }}
+          use_lz4_zstd: ${{ inputs.use_lz4_zstd }}
           hook_mode: ${{ inputs.hook_mode }}
           ksu_debug: ${{ inputs.ksu_debug }}
 
@@ -440,7 +500,7 @@ jobs:
       - name: Upload Commit Info
         uses: actions/upload-artifact@v7
         with:
-          name: commit-info-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}
+          name: commit-info-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}${{ env.ADIOS_SUFFIX }}
           path: kernel_workspace/common/commit_info/
           retention-days: 1
 
@@ -474,7 +534,7 @@ jobs:
         if: inputs.build_ebpf
         uses: actions/upload-artifact@v7
         with:
-          name: vmlinux-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}
+          name: vmlinux-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}${{ env.ADIOS_SUFFIX }}${{ env.ZRAM_SUFFIX }}
           path: kernel_workspace/common/out/vmlinux.zst
           retention-days: 1
 
@@ -483,7 +543,7 @@ jobs:
         run: |
           IMAGE="common/out/arch/arm64/boot/Image"
           [ -f "$IMAGE" ] || { echo "Binary Missing!"; exit 1; }
-          ZIP_NAME="${{ inputs.variant }}_Kernel-${{ inputs.kernel_version }}.${{ steps.cfg.outputs.sub_level }}${{ steps.cfg.outputs.r_suffix }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}.zip"
+          ZIP_NAME="${{ inputs.variant }}_Kernel-${{ inputs.kernel_version }}.${{ steps.cfg.outputs.sub_level }}${{ steps.cfg.outputs.r_suffix }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}${{ env.ADIOS_SUFFIX }}${{ env.ZRAM_SUFFIX }}.zip"
           git clone --depth 1 --branch ${{ steps.cfg.outputs.anykernel_branch }} https://github.com/midori01/AnyKernel3 anykernel
           cp "$IMAGE" anykernel/
           cd anykernel && rm -rf .git && zip -r9 "../$ZIP_NAME" *
@@ -493,11 +553,11 @@ jobs:
         if: inputs.use_ccache
         uses: actions/cache/save@v6
         with:
-          path: .ccache-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}
-          key: ${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ steps.cfg.outputs.asb_date }}${{ steps.cfg.outputs.r_suffix }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}-${{ github.run_id }}
+          path: .ccache-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && inputs.kernel_version == '6.12' && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}
+          key: ${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ steps.cfg.outputs.asb_date }}${{ steps.cfg.outputs.r_suffix }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && inputs.kernel_version == '6.12' && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}-${{ github.run_id }}
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Kernel-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}${{ steps.cfg.outputs.r_suffix }}
+          name: Kernel-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}${{ env.ADIOS_SUFFIX }}${{ env.ZRAM_SUFFIX }}${{ steps.cfg.outputs.r_suffix }}
           path: kernel_workspace/${{ env.ZIP_NAME }}
