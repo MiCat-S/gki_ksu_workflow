@@ -1,6 +1,6 @@
-From: midori01 <midori01@users.noreply.github.com>
-Date: Sat, 23 May 2026 11:29:27 +0900
-Subject: [PATCH] ReSukiSU manual hooks for android16-6.12-2025-06
+From: midori01 <lv@lvlv.lv>
+Date: Sat, 22 Aug 2026 15:49:20 +0900
+Subject: [PATCH] ReSukiSU manual hooks for android16-6.12
 
 ---
  fs/exec.c       | 12 ++++++++++++
@@ -12,10 +12,10 @@ Subject: [PATCH] ReSukiSU manual hooks for android16-6.12-2025-06
  6 files changed, 70 insertions(+), 1 deletion(-)
 
 diff --git a/fs/exec.c b/fs/exec.c
-index ee89e0f3a..25f772a8d 100644
+index 965fdc593d65..b5089542efb2 100644
 --- a/fs/exec.c
 +++ b/fs/exec.c
-@@ -2054,12 +2054,21 @@ int kernel_execve(const char *kernel_filename,
+@@ -2076,12 +2076,21 @@ int kernel_execve(const char *kernel_filename,
  	return retval;
  }
  
@@ -37,7 +37,7 @@ index ee89e0f3a..25f772a8d 100644
  	return do_execveat_common(AT_FDCWD, filename, argv, envp, 0);
  }
  
-@@ -2087,6 +2096,9 @@ static int compat_do_execve(struct filename *filename,
+@@ -2109,6 +2118,9 @@ static int compat_do_execve(struct filename *filename,
  		.is_compat = true,
  		.ptr.compat = __envp,
  	};
@@ -48,7 +48,7 @@ index ee89e0f3a..25f772a8d 100644
  }
  
 diff --git a/fs/open.c b/fs/open.c
-index 1ff947b32..247c9828c 100644
+index 99fc54ecdc8a..011f65fddc55 100644
 --- a/fs/open.c
 +++ b/fs/open.c
 @@ -537,8 +537,17 @@ static long do_faccessat(int dfd, const char __user *filename, int mode, int fla
@@ -70,7 +70,7 @@ index 1ff947b32..247c9828c 100644
  }
  
 diff --git a/fs/read_write.c b/fs/read_write.c
-index eaaf755c4..3c9ad9d84 100644
+index b4204f045fa4..7c018cc9da30 100644
 --- a/fs/read_write.c
 +++ b/fs/read_write.c
 @@ -718,8 +718,18 @@ ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
@@ -93,7 +93,7 @@ index eaaf755c4..3c9ad9d84 100644
  }
  
 diff --git a/fs/stat.c b/fs/stat.c
-index adb071bc9..4563e8246 100644
+index adb071bc92e1..4563e824600f 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -495,6 +495,17 @@ SYSCALL_DEFINE2(newlstat, const char __user *, filename,
@@ -155,10 +155,10 @@ index adb071bc9..4563e8246 100644
  	if (error)
  		return error;
 diff --git a/kernel/reboot.c b/kernel/reboot.c
-index bcc98b547..8a758b2c0 100644
+index 45681d03d331..b3be82fcfe91 100644
 --- a/kernel/reboot.c
 +++ b/kernel/reboot.c
-@@ -715,13 +715,20 @@ DEFINE_MUTEX(system_transition_mutex);
+@@ -716,13 +716,20 @@ DEFINE_MUTEX(system_transition_mutex);
   *
   * reboot doesn't sync: do that yourself before calling this.
   */
@@ -181,7 +181,7 @@ index bcc98b547..8a758b2c0 100644
  	if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))
  		return -EPERM;
 diff --git a/kernel/sys.c b/kernel/sys.c
-index 4a87dc5fa..8a0f7a021 100644
+index 1a154c425e1b..8fc4a855d274 100644
 --- a/kernel/sys.c
 +++ b/kernel/sys.c
 @@ -679,6 +679,10 @@ SYSCALL_DEFINE1(setuid, uid_t, uid)
@@ -207,5 +207,5 @@ index 4a87dc5fa..8a0f7a021 100644
  	keuid = make_kuid(ns, euid);
  	ksuid = make_kuid(ns, suid);
 -- 
-2.54.0
+2.55.0
 
