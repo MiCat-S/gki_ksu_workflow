@@ -311,7 +311,7 @@ jobs:
         run: |
           case "${{ inputs.variant }}" in
             MidoriSU-XX)
-              patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/scope-min-manual-hooks-v2.2.patch"
+              patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/scope-min-manual-hooks-v2.3.patch"
               ;;
             MidoriSU-RX)
               patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/resukisu-manual-hooks.patch"
