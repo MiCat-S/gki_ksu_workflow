@@ -170,7 +170,7 @@ runs:
         EOF
         fi
 
-        if [ "${{ inputs.use_adios }}" = "true" ]; then
+        if [ "${{ inputs.use_adios }}" = "true" ] && [ "${{ inputs.kernel_version }}" != "6.1" ]; then
           cat >> $DEFCONFIG <<-'EOF'
         CONFIG_MQ_IOSCHED_ADIOS=y
         CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y
