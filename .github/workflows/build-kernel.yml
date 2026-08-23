@@ -98,9 +98,9 @@ jobs:
     env:
       DS_SUFFIX: ${{ inputs.use_droidspaces && '-DS' || '' }}
       SUSFS_SUFFIX: ${{ inputs.use_susfs && '-SUSFS' || '' }}
-      ADIOS_SUFFIX: ${{ inputs.use_adios && inputs.kernel_version == '6.12' && '-ADIOS' || '' }}
+      ADIOS_SUFFIX: ${{ inputs.use_adios && '-ADIOS' || '' }}
       ZRAM_SUFFIX: ${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-LZ4ZSTD' || '' }}
-      CCACHE_DIR: ${{ github.workspace }}/.ccache-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && inputs.kernel_version == '6.12' && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}
+      CCACHE_DIR: ${{ github.workspace }}/.ccache-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}
       CCACHE_COMPILERCHECK: content
       CCACHE_SLOPPINESS: file_macro,time_macros,include_file_mtime,include_file_ctime
 
@@ -142,9 +142,9 @@ jobs:
         id: cache-restore
         uses: ./.github/actions/restore-cache-retry
         with:
-          path: .ccache-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && inputs.kernel_version == '6.12' && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}
-          key: ${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ steps.cfg.outputs.asb_date }}${{ steps.cfg.outputs.r_suffix }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && inputs.kernel_version == '6.12' && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}-${{ github.run_id }}
-          restore-keys: ${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ steps.cfg.outputs.asb_date }}${{ steps.cfg.outputs.r_suffix }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && inputs.kernel_version == '6.12' && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}-
+          path: .ccache-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}
+          key: ${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ steps.cfg.outputs.asb_date }}${{ steps.cfg.outputs.r_suffix }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}-${{ github.run_id }}
+          restore-keys: ${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ steps.cfg.outputs.asb_date }}${{ steps.cfg.outputs.r_suffix }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}-
 
       - name: Setup Ccache Wrappers
         if: inputs.use_ccache
@@ -371,13 +371,13 @@ jobs:
         run: |
           patch -p1 < "${{ github.workspace }}/.github/patches/unicode_bypass_fix_6.1+.patch"
 
-      - name: Apply ADIOS I/O Scheduler (6.12 only)
-        if: inputs.use_adios && inputs.kernel_version == '6.12'
+      - name: Apply ADIOS I/O Scheduler
+        if: inputs.use_adios
         working-directory: kernel_workspace/common
         run: |
-          patch -p1 --forward --fuzz=3 < "${{ github.workspace }}/.github/patches/adios.patch"
+          patch -p1 --forward --fuzz=3 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/adios.patch"
 
-      - name: Apply LZ4/Zstd zram (6.12 only)
+      - name: Apply LZ4/ZSTD ZRAM
         if: inputs.use_lz4_zstd && inputs.kernel_version == '6.12'
         working-directory: kernel_workspace/common
         run: |
@@ -528,8 +528,8 @@ jobs:
         if: inputs.use_ccache
         uses: actions/cache/save@v6
         with:
-          path: .ccache-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && inputs.kernel_version == '6.12' && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}
-          key: ${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ steps.cfg.outputs.asb_date }}${{ steps.cfg.outputs.r_suffix }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && inputs.kernel_version == '6.12' && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}-${{ github.run_id }}
+          path: .ccache-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}
+          key: ${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ steps.cfg.outputs.asb_date }}${{ steps.cfg.outputs.r_suffix }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}-${{ github.run_id }}
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v7
