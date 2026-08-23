@@ -524,7 +524,7 @@ jobs:
             - **Spoofed Uname**: `${{ matrix.kv }}.${{ env.UNAME_SUB }}${{ needs.setup.outputs.kernel_localversion }}`
             - **Spoofed Build Time**: `${{ needs.setup.outputs.build_timestamp }}`
             - **Spoofed Builder**: `${{ needs.setup.outputs.build_user }}@${{ needs.setup.outputs.build_host }}`
-            - **Unicode Bypass Fix**: ✅　**CVE-2026-43499 Fix**: ${{ matrix.kv == '6.12' && '✅' || '❌' }}
+            - **Unicode Bypass Fix**: ✅　**CVE-2026-43499 Fix**: ✅
             - **ADIOS I/O Scheduler**: ${{ inputs.use_adios && matrix.kv == '6.12' && '✅' || '❌' }}　**LZ4/Zstd zram**: ${{ inputs.use_lz4_zstd && matrix.kv == '6.12' && '✅' || '❌' }}
             - **Droidspaces**: ${{ inputs.use_droidspaces && '✅' || '❌' }}　**NTSync**: ${{ inputs.use_droidspaces && '✅' || '❌' }}　**TMPFS**: ✅
             - **TCP BBR**: ✅　**IPSET**: ✅　**Enhanced NAT**: ✅
