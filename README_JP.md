@@ -101,7 +101,32 @@
 | **Droidspaces** | [Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS) を利用したコンテナ対応。SYSVIPC、IPC_NS、PID_NS、DEVTMPFS、NTSync、ネットワーク機能を提供します。`use_droidspaces` トグルでバリアントごとに有効化できます。 |
 | **Re:Kernel(-X)** | [Re:Kernel](https://github.com/Sakion-Team/Re-Kernel) および [Re:Kernel-X](https://github.com/myflavor/ReKernel-X) モジュールをカーネルに直接組み込みます。tombstone によるフリーズ復旧、ネットワークトリガーによる解除、binder 非同期クリーンアップを提供します。`use_rekernel` スイッチで制御します。 |
 | **Unicode バイパス修正** | 常に有効です。非標準の Unicode エンコーディングを用いたファイルシステムバイパス攻撃を防ぐため、カーネルの Unicode 正規化処理にパッチを適用します。 |
-| **ADIOS I/O スケジューラ** | オプションで [ADIOS 3.2.0](https://github.com/firelzrd/adios) を kernel 6.12 ビルドの組み込みデフォルト・マルチキュー I/O スケジューラとして統合します。`use_adios` トグルで有効化し、6.1 および 6.6 ビルドは変更されません。 |
+| **ADIOS I/O スケジューラ** | オプションで [ADIOS](https://github.com/firelzrd/adios) を kernel 6.6 および 6.12 ビルドの組み込みデフォルト・マルチキュー I/O スケジューラとして統合します。`use_adios` トグルで有効化し、kernel 6.1 は変更されません。 |
 | **LZ4/Zstd zram バックエンド** | オプションでカーネルの LZ4 と Zstd 実装を公式 LZ4 1.10.0 および Zstandard 1.5.7 に更新し、kernel 6.12 の zram バックエンドを有効化します。`use_lz4_zstd` トグルで制御し、6.1 および 6.6 ビルドは変更されません。 |
 | **Ccache** | 依存関係のインストール完了後に 60 秒間の待機プロセスを設けることでコンパイラキャッシュを安全に統合。ワークフロー実行をまたいだ、安定かつ堅牢な増分ビルドの高速化を実現します。 |
 | **ビルドメタデータのカスタマイズ** | コンパイル済みイメージに埋め込む `カーネル名`、`ビルド日時`、`ユーザー名`、`ホスト名` を任意に設定できます。 |
+
+---
+
+## ✅ 動作確認済み端末
+
+本ワークフローでビルドしたカーネルにて、下記端末での動作を確認済みです。
+
+| ブランド | モデル |
+| :--- | :--- |
+| Google | Pixel 7/8/9/10 シリーズ (Tensor) |
+| Xiaomi | Xiaomi 17 シリーズ (Snapdragon) |
+| Xiaomi | REDMI K90 Pro Max (Snapdragon) |
+| Tecno | Tecno Camon 40 Pro 4G (Helio) |
+
+> [!NOTE]
+> **互換性について**
+> - 記載の端末はいずれも Android 16 以降・GKI カーネル（6.1/6.6/6.12）環境で動作しています
+> - SUSFS / Droidspaces は全シリーズで検証済みです
+> - 純正 ROM をご利用の場合は、選択した KernelSU バリアントのマネージャー、または Kernel Flasher からの書き込みを推奨します
+
+> [!TIP]
+> **お使いの端末がリストにない場合**
+> カーネルの動作確認ができましたら、Issue または Pull Request でお知らせください。リストに追記します。
+
+---

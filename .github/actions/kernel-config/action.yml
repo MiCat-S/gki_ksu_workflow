@@ -39,7 +39,7 @@ inputs:
     required: false
     default: 'false'
   use_adios:
-    description: 'Set to "true" to inject ADIOS 3.2.0 configs (kernel 6.12 only)'
+    description: 'Set to "true" to inject ADIOS configs (kernel 6.6 and 6.12 only)'
     required: false
     default: 'false'
   use_lz4_zstd:
@@ -170,7 +170,7 @@ runs:
         EOF
         fi
 
-        if [ "${{ inputs.use_adios }}" = "true" ] && [ "${{ inputs.kernel_version }}" = "6.12" ]; then
+        if [ "${{ inputs.use_adios }}" = "true" ] && [ "${{ inputs.kernel_version }}" != "6.1" ]; then
           cat >> $DEFCONFIG <<-'EOF'
         CONFIG_MQ_IOSCHED_ADIOS=y
         CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y

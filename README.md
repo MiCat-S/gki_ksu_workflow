@@ -101,7 +101,32 @@ Use the manager distributed by the selected upstream: [KowSU](https://github.com
 | **Droidspaces** | Container support via [Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS) — SYSVIPC, IPC_NS, PID_NS, DEVTMPFS, NTSync, and networking. Enabled per-variant through the `use_droidspaces` toggle. |
 | **Re:Kernel(-X)** | Integrated [Re:Kernel](https://github.com/Sakion-Team/Re-Kernel) and [Re:Kernel-X](https://github.com/myflavor/ReKernel-X) modules compiled directly into the kernel. Provides tombstone freeze recovery, network-triggered unfreeze, and binder async cleanup. Toggled via `use_rekernel` switch. |
 | **Unicode Bypass Fix** | Always enabled. Patches kernel unicode normalization to prevent filesystem bypass attacks via non-standard unicode encodings. |
-| **ADIOS I/O Scheduler** | Optionally integrates [ADIOS 3.2.0](https://github.com/firelzrd/adios) as the built-in default multi-queue I/O scheduler for kernel 6.12 builds. Enabled through the `use_adios` toggle; 6.1 and 6.6 builds remain unchanged. |
+| **ADIOS I/O Scheduler** | Optionally integrates [ADIOS](https://github.com/firelzrd/adios) as the built-in default multi-queue I/O scheduler for kernel 6.6 and 6.12 builds. Enabled through the `use_adios` toggle; kernel 6.1 remains unchanged. |
 | **LZ4/Zstd zram backends** | Optionally updates the kernel's LZ4 and Zstd implementations from the official LZ4 1.10.0 and Zstandard 1.5.7 releases, with zram backend support enabled for kernel 6.12. Controlled by the `use_lz4_zstd` toggle; 6.1 and 6.6 builds remain unchanged. |
 | **Ccache** | Compiler cache integration with a 60-second wait guard for dependency installation, ensuring robust accelerated incremental rebuilds across workflow runs. |
 | **Spoofed Build Metadata** | Customizable `kernel name`, `build timestamp`, `user`, and `host` strings for the compiled image. |
+
+---
+
+## ✅ Tested Devices
+
+The following devices have been confirmed to work with kernels built by this workflow:
+
+| Brand | Model |
+| :--- | :--- |
+| Google | Pixel 7/8/9/10 series (Tensor) |
+| Xiaomi | Xiaomi 17 series (Snapdragon) |
+| Xiaomi | REDMI K90 Pro Max (Snapdragon) |
+| Tecno | Tecno Camon 40 Pro 4G (Helio) |
+
+> [!NOTE]
+> **Compatibility Notes:**
+> - All listed devices run Android 16+ with GKI kernels (6.1/6.6/6.12)
+> - SUSFS and Droidspaces features have been tested on all device families
+> - Users on stock ROMs are advised to flash the kernel via the manager provided by their selected KernelSU variant or Kernel Flasher
+
+> [!TIP]
+> **Have a device not listed?**
+> If you've successfully tested a kernel on your device, feel free to open an issue or pull request to have it added to this list!
+
+---

@@ -101,7 +101,32 @@
 | **Droidspaces** | [Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS)를 활용한 컨테이너 지원 기능으로 SYSVIPC, IPC_NS, PID_NS, DEVTMPFS, NTSync, 네트워킹 기능을 제공합니다. `use_droidspaces` 옵션을 통해 배리언트마다 활성화할 수 있습니다. |
 | **Re:Kernel(-X)** | [Re:Kernel](https://github.com/Sakion-Team/Re-Kernel) 및 [Re:Kernel-X](https://github.com/myflavor/ReKernel-X) 모듈을 커널에 직접 내장합니다. 툼스톤(tombstone) 기반 프리즈 복구, 네트워크 트리거 해제, 바인더(binder) 비동기 정리를 제공합니다. `use_rekernel` 옵션으로 제어합니다. |
 | **유니코드 바이패스 수정** | 항상 활성화됩니다. 비표준 유니코드 인코딩을 이용한 파일시스템 우회 공격을 방지하기 위해 커널의 유니코드 정규화 로직을 패치합니다. |
-| **ADIOS I/O 스케줄러** | 선택적으로 [ADIOS 3.2.0](https://github.com/firelzrd/adios)을 kernel 6.12 빌드의 내장 기본 멀티큐 I/O 스케줄러로 통합합니다. `use_adios` 옵션으로 활성화하며, 6.1 및 6.6 빌드는 변경되지 않습니다. |
+| **ADIOS I/O 스케줄러** | 선택적으로 [ADIOS](https://github.com/firelzrd/adios)를 kernel 6.6 및 6.12 빌드의 내장 기본 멀티큐 I/O 스케줄러로 통합합니다. `use_adios` 옵션으로 활성화하며, kernel 6.1은 변경되지 않습니다. |
 | **LZ4/Zstd zram 백엔드** | 선택적으로 커널의 LZ4 및 Zstd 구현을 공식 LZ4 1.10.0 및 Zstandard 1.5.7 릴리스로 업데이트하고 kernel 6.12의 zram 백엔드를 활성화합니다. `use_lz4_zstd` 옵션으로 제어하며, 6.1 및 6.6 빌드는 변경되지 않습니다. |
 | **Ccache** | 의존성 설치 완료 후 60초 대기 시간을 두어 컴파일러 캐시를 안전하게 통합합니다. 여러 워크플로우 실행에 걸쳐 안정적이고 강력한 증분 빌드 속도 향상을 제공합니다. |
 | **빌드 메타데이터 커스터마이징** | 컴파일된 이미지에 포함되는 `커널 이름`, `빌드 타임스탬프`, `사용자 이름`, `호스트 이름` 문자열을 자유롭게 설정할 수 있습니다. |
+
+---
+
+## ✅ 테스트 완료 기기
+
+본 워크플로우로 빌드한 커널에서 아래 기기들의 동작을 확인했습니다.
+
+| 브랜드 | 모델 |
+| :--- | :--- |
+| Google | Pixel 7/8/9/10 시리즈 (Tensor) |
+| Xiaomi | Xiaomi 17 시리즈 (Snapdragon) |
+| Xiaomi | REDMI K90 Pro Max (Snapdragon) |
+| Tecno | Tecno Camon 40 Pro 4G (Helio) |
+
+> [!NOTE]
+> **호환성 안내**
+> - 나열된 모든 기기는 Android 16 이상, GKI 커널(6.1/6.6/6.12) 환경에서 동작합니다
+> - SUSFS 및 Droidspaces 기능은 전 시리즈에서 검증되었습니다
+> - 순정 ROM 이용 시 선택한 KernelSU 배리언트에서 제공하는 매니저 또는 Kernel Flasher로 플래시하는 것을 권장합니다
+
+> [!TIP]
+> **목록에 없는 기기를 사용 중이라면?**
+> 커널이 정상 동작하는 것을 확인하셨다면 Issue 또는 Pull Request로 알려주세요. 목록에 추가하겠습니다.
+
+---
