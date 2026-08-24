@@ -466,6 +466,14 @@ jobs:
             fi
             out "susfs_date=\`$(cat commit_info/susfs_date)\`"
           fi
+          if ls commit_info/cve_fixed_* >/dev/null 2>&1; then
+            if grep -l '^false$' commit_info/cve_fixed_* >/dev/null 2>&1; then
+              out "cve_fixed=false"
+              out "cve_failed_subs=$(grep -l '^false$' commit_info/cve_fixed_* | sed 's/commit_info\/cve_fixed_//' | tr '\n' ' ' | sed 's/ $//')"
+            else
+              out "cve_fixed=true"
+            fi
+          fi
           rekernel_line "Re:Kernel" commit_info/rekernel_commit
           rekernel_x_line "Re:Kernel-X" commit_info/rekernel_x_commit
           ksu_line KowSU kowsu "$(cat commit_info/kowsu_ksu_repo 2>/dev/null)" commit_info/kowsu_ksu_commit
@@ -494,7 +502,7 @@ jobs:
             - **Spoofed Uname**: `${{ matrix.kv }}.${{ env.UNAME_SUB }}${{ needs.setup.outputs.kernel_localversion }}`
             - **Spoofed Build Time**: `${{ needs.setup.outputs.build_timestamp }}`
             - **Spoofed Builder**: `${{ needs.setup.outputs.build_user }}@${{ needs.setup.outputs.build_host }}`
-            - **Unicode Bypass Fix**: ✅　**CVE-2026-43499 Fix**: ✅
+            - **Unicode Bypass Fix**: ✅　**CVE-2026-43499 Fix**: ${{ steps.ksu_info.outputs.cve_fixed == 'true' && '✅' || format('❌ ({0})', steps.ksu_info.outputs.cve_failed_subs) }}
             - **Ccache Speedup**: ${{ inputs.use_ccache && '✅' || '❌' }}　**ADIOS I/O Scheduler**: ${{ inputs.use_adios && matrix.kv != '6.1' && '✅' || '❌' }}　**LZ4/ZSTD ZRAM**: ${{ inputs.use_lz4_zstd && matrix.kv == '6.12' && '✅' || '❌' }}
             - **Droidspaces**: ${{ inputs.use_droidspaces && '✅' || '❌' }}　**NTSync**: ${{ inputs.use_droidspaces && '✅' || '❌' }}　**TMPFS**: ✅
             - **TCP BBR**: ✅　**IPSET**: ✅　**Enhanced NAT**: ✅
