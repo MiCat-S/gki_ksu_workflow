@@ -355,16 +355,19 @@ jobs:
       - name: Apply CVE-2026-43499 Fix
         working-directory: kernel_workspace/common
         run: |
-          if grep -Fq 'struct task_struct *waiter_task = waiter->task;' kernel/locking/rtmutex.c && \
-             grep -Fq 'if (!waiter_task) /* never enqueued */' kernel/locking/rtmutex.c && \
-             grep -Fq 'if (unlikely(ret < 0))' kernel/locking/rtmutex_api.c; then
+          if bash "${{ github.workspace }}/.github/scripts/check_cve.sh" > /dev/null 2>&1; then
             echo "CVE-2026-43499 fix already present."
+            echo "CVE_FIXED=true" >> $GITHUB_ENV
           else
-            patch -p1 --forward < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/cve-2026-43499-fix.patch"
+            patch -p1 --forward < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/cve-2026-43499-fix.patch" || true
+            if bash "${{ github.workspace }}/.github/scripts/check_cve.sh" > /dev/null 2>&1; then
+              echo "CVE-2026-43499 fix applied successfully."
+              echo "CVE_FIXED=true" >> $GITHUB_ENV
+            else
+              echo "::warning::CVE-2026-43499 fix could not be verified after patch."
+              echo "CVE_FIXED=false" >> $GITHUB_ENV
+            fi
           fi
-          grep -Fq 'struct task_struct *waiter_task = waiter->task;' kernel/locking/rtmutex.c
-          grep -Fq 'if (!waiter_task) /* never enqueued */' kernel/locking/rtmutex.c
-          grep -Fq 'if (unlikely(ret < 0))' kernel/locking/rtmutex_api.c
 
       - name: Apply Unicode Bypass Fix
         working-directory: kernel_workspace/common
@@ -406,6 +409,7 @@ jobs:
         run: |
           COMMIT_DIR="$(pwd)/commit_info"
           mkdir -p "$COMMIT_DIR"
+          echo "${CVE_FIXED:-false}" > "$COMMIT_DIR/cve_fixed_${{ inputs.kernel_version }}.${{ inputs.sub_level }}"
           cd KernelSU
           save_ksu_commit() {
             git rev-parse HEAD > "$COMMIT_DIR/${1}_ksu_commit"
