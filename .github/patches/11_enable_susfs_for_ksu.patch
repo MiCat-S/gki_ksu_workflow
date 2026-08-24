@@ -1,24 +1,25 @@
 From: midori01 <lv@lvlv.lv>
-Date: Sun, 23 Aug 2026 07:00:00 +0900
+Date: Mon, 24 Aug 2026 12:00:00 +0900
 Subject: [PATCH] Enable SUSFS for MidoriSU-XX
 
 ---
- kernel/Kconfig                 |  98 ++++++++++++++++++++
- kernel/feature/kernel_umount.c |  46 +++++++---
- kernel/hook/setuid_hook.c      | 159 ++++++++++++++++++++++++++++-----
- kernel/ksu.c                   |   8 ++
- kernel/selinux/rules.c         |  13 +--
- kernel/selinux/selinux.c       | 103 +++++++++++++++++++++
- kernel/selinux/selinux.h       |  14 +++
- kernel/supercall/dispatch.c    |  24 +++++
- kernel/supercall/supercall.c   |  99 ++++++++++++++++++++
- 9 files changed, 522 insertions(+), 42 deletions(-)
+ kernel/Kconfig                        |  98 ++++++++++++++++
+ kernel/downstream/ksu_hostsredirect.h |   4 +
+ kernel/feature/kernel_umount.c        |  49 +++++---
+ kernel/hook/setuid_hook.c             | 159 ++++++++++++++++++++++----
+ kernel/ksu.c                          |   8 ++
+ kernel/selinux/rules.c                |  13 ++-
+ kernel/selinux/selinux.c              | 103 +++++++++++++++++
+ kernel/selinux/selinux.h              |  14 +++
+ kernel/supercall/dispatch.c           |  24 ++++
+ kernel/supercall/supercall.c          |  99 ++++++++++++++++
+ 10 files changed, 526 insertions(+), 45 deletions(-)
 
 diff --git a/kernel/Kconfig b/kernel/Kconfig
-index 4708df1f9..583a90c16 100644
+index 18b97b7f5..77df2e4bb 100644
 --- a/kernel/Kconfig
 +++ b/kernel/Kconfig
-@@ -116,4 +116,102 @@ config KSU_HEURISTIC_IN_TREE_BUILD
+@@ -128,4 +128,102 @@ config KSU_HEURISTIC_IN_TREE_BUILD
  	depends on KSU
  	default y
  
@@ -121,8 +122,24 @@ index 4708df1f9..583a90c16 100644
 +endmenu
 +
  endmenu
+diff --git a/kernel/downstream/ksu_hostsredirect.h b/kernel/downstream/ksu_hostsredirect.h
+index 569c010cc..46ac455dc 100644
+--- a/kernel/downstream/ksu_hostsredirect.h
++++ b/kernel/downstream/ksu_hostsredirect.h
+@@ -14,7 +14,11 @@
+ #ifndef __KSU_H_HOSTSREDIRECT
+ #define __KSU_H_HOSTSREDIRECT
+ 
++#ifndef CONFIG_KSU_SUSFS
+ static bool ksu_kernel_umount_enabled __read_mostly;
++#else
++extern bool ksu_kernel_umount_enabled;
++#endif
+ 
+ static inline void ksu_hosts_file_redirect(const char __user *filename, int flags, int *fd_ptr)
+ {
 diff --git a/kernel/feature/kernel_umount.c b/kernel/feature/kernel_umount.c
-index 83771fdaf..d6cf816f7 100644
+index 03046823e..d6cf816f7 100644
 --- a/kernel/feature/kernel_umount.c
 +++ b/kernel/feature/kernel_umount.c
 @@ -1,4 +1,8 @@
@@ -199,7 +216,7 @@ index 83771fdaf..d6cf816f7 100644
  	// There are 6 scenarios:
  	// 1. Normal app: zygote -> appuid
  	// 2. Isolated process forked from zygote: zygote -> isolated_process
-@@ -99,15 +126,6 @@ static inline int ksu_handle_umount(struct cred *new, const struct cred *old)
+@@ -99,18 +126,6 @@ static inline int ksu_handle_umount(struct cred *new, const struct cred *old)
  	if (!ksu_uid_should_umount(new_uid) && !is_isolated_process(new_uid))
  		return 0;
  
@@ -212,6 +229,9 @@ index 83771fdaf..d6cf816f7 100644
 -		pr_info("handle umount ignore non zygote child: %d\n", current->pid);
 -		return 0;
 -	}
+-
+-	set_thread_flag(TIF_KSU_UNMOUNTABLE);
+-
  	// umount the target mnt
  	pr_info("handle umount for uid: %d, pid: %d\n", new_uid, current->pid);
  
@@ -390,10 +410,10 @@ index 925798048..da377a98b 100644
 +#endif
  }
 diff --git a/kernel/ksu.c b/kernel/ksu.c
-index 026198a20..9cc35a184 100644
+index f7fc486c9..c7ebfb734 100644
 --- a/kernel/ksu.c
 +++ b/kernel/ksu.c
-@@ -148,6 +148,10 @@
+@@ -152,6 +152,10 @@
  #include "hook/kp_ksud.c"
  #endif
  
@@ -404,7 +424,7 @@ index 026198a20..9cc35a184 100644
  // track backports and other quirks here
  // ref: kernel_compat.c, Makefile
  // yes looks nasty
-@@ -244,6 +248,10 @@ static int __init kernelsu_init(void)
+@@ -248,6 +252,10 @@ static int __init kernelsu_init(void)
  
  	ksu_throne_tracker_init();
  
