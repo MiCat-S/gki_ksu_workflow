@@ -517,6 +517,10 @@ jobs:
           [ -f "$IMAGE" ] || { echo "Binary Missing!"; exit 1; }
           ZIP_NAME="${{ inputs.variant }}_Kernel-${{ inputs.kernel_version }}.${{ steps.cfg.outputs.sub_level }}${{ steps.cfg.outputs.r_suffix }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}${{ env.ADIOS_SUFFIX }}${{ env.ZRAM_SUFFIX }}.zip"
           git clone --depth 1 --branch ${{ steps.cfg.outputs.anykernel_branch }} https://github.com/midori01/AnyKernel3 anykernel
+          sed -i 's/^kernel\.string=.*/kernel.string=Autlin Kernel/' anykernel/anykernel.sh
+          sed -i 's/^ui_print "Flashing .*"/ui_print "Flashing Autlin Kernel..."/' anykernel/anykernel.sh
+          grep -Fqx 'kernel.string=Autlin Kernel' anykernel/anykernel.sh
+          grep -Fqx 'ui_print "Flashing Autlin Kernel..."' anykernel/anykernel.sh
           cp "$IMAGE" anykernel/
           cd anykernel && rm -rf .git && zip -r9 "../$ZIP_NAME" *
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
