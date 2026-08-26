@@ -134,7 +134,7 @@ on:
       build_user_host:
         description: 'Spoof Builder (user@host)'
         required: true
-        default: 'kleaf@build.com-host'
+        default: 'kleaf@build-host'
         type: string
       release_type:
         description: 'Release Type'
