@@ -124,17 +124,17 @@ on:
       kernel_localversion:
         description: 'Spoof Kernel Name (Leave blank for auto)'
         required: false
-        default: ''
+        default: '-android16-5-gb23e74f69076-abogki452159376-4k'
         type: string
       build_timestamp:
         description: 'Spoof Build Time (Leave blank for now)'
         required: false
-        default: ''
+        default: 'Tue Oct 14 12:08:17 UTC 2025'
         type: string
       build_user_host:
         description: 'Spoof Builder (user@host)'
         required: true
-        default: 'midori@build-host'
+        default: 'kleaf@build.com-host'
         type: string
       release_type:
         description: 'Release Type'
