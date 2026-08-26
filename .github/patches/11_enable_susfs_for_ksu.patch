@@ -1,19 +1,19 @@
 From: midori01 <lv@lvlv.lv>
-Date: Wed, 26 Aug 2026 08:00:00 +0900
+Date: Thu, 27 Aug 2026 06:50:24 +0900
 Subject: [PATCH] Enable SUSFS for KernelSU-XX
 
 ---
  kernel/Kconfig                        |  98 +++++++++++++++
  kernel/downstream/ksu_hostsredirect.h |   4 +
  kernel/feature/kernel_umount.c        |  56 ++++++---
- kernel/hook/setuid_hook.c             | 172 ++++++++++++++++++++++----
+ kernel/hook/setuid_hook.c             | 169 +++++++++++++++++++++++---
  kernel/ksu.c                          |   8 ++
- kernel/selinux/rules.c                |  13 +-
- kernel/selinux/selinux.c              | 103 +++++++++++++++
+ kernel/selinux/rules.c                |   7 ++
+ kernel/selinux/selinux.c              | 103 ++++++++++++++++
  kernel/selinux/selinux.h              |  14 +++
  kernel/supercall/dispatch.c           |  24 ++++
  kernel/supercall/supercall.c          |  99 +++++++++++++++
- 10 files changed, 545 insertions(+), 46 deletions(-)
+ 10 files changed, 545 insertions(+), 37 deletions(-)
 
 diff --git a/kernel/Kconfig b/kernel/Kconfig
 index 18b97b7f5..77df2e4bb 100644
@@ -243,7 +243,7 @@ index a931624b8..fe988bfc7 100644
  	pr_info("handle umount for uid: %d, pid: %d\n", new_uid, current->pid);
  
 diff --git a/kernel/hook/setuid_hook.c b/kernel/hook/setuid_hook.c
-index 925798048..229424437 100644
+index 925798048..c0cdcad33 100644
 --- a/kernel/hook/setuid_hook.c
 +++ b/kernel/hook/setuid_hook.c
 @@ -1,4 +1,137 @@
@@ -385,13 +385,10 @@ index 925798048..229424437 100644
  {
  	if (!new || !old)
  		return;
-@@ -10,27 +143,22 @@ static __always_inline void ksu_handle_setresuid_cred(struct cred *new, const st
- 	if (unlikely(!!old_uid))
- 		return;
+@@ -13,24 +146,22 @@ static __always_inline void ksu_handle_setresuid_cred(struct cred *new, const st
+ 	if (IS_ENABLED(CONFIG_KSU_DEBUG))
+ 		pr_info("handle_setresuid from %d to %d\n", old_uid, new_uid);
  
--	if (IS_ENABLED(CONFIG_KSU_DEBUG))
--		pr_info("handle_setresuid from %d to %d\n", old_uid, new_uid);
--
 -	// we dont have those new fancy things upstream has
 -	// lets just do the original thing where we disable seccomp
 -	if (unlikely(is_uid_manager(new_uid)))
@@ -456,23 +453,10 @@ index ff786d174..7441a2200 100644
  
  	ksu_file_wrapper_init();
 diff --git a/kernel/selinux/rules.c b/kernel/selinux/rules.c
-index 12a7a1709..5849441bf 100644
+index 12a7a1709..9f7743f33 100644
 --- a/kernel/selinux/rules.c
 +++ b/kernel/selinux/rules.c
-@@ -171,12 +171,6 @@ out_unlock:
- 	if (!lock)
- 		goto do_stop_machine;
- 
--	/*
--	 * HACK: write_lock() is held with preempt enabled. DO NOT let the
--	 * task be migrated to any other CPU than the current CPU. And since
--	 * set_cpus_allowed_ptr() can sleep, use raw_smp_processor_id() to get
--	 * current CPU and bypass preemption checks.
--	 */
- 	cpumask_t old_mask;
- 	cpumask_copy(&old_mask, ksu_get_current_cpumask_t());
- 	set_cpus_allowed_ptr(current, cpumask_of(raw_smp_processor_id()));
-@@ -200,6 +194,13 @@ out_flush:
+@@ -200,6 +200,13 @@ out_flush:
  	smp_mb();
  	reset_avc_cache();
  #endif
