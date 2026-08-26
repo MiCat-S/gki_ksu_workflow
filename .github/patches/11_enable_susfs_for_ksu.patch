@@ -1,6 +1,6 @@
 From: midori01 <lv@lvlv.lv>
 Date: Wed, 26 Aug 2026 08:00:00 +0900
-Subject: [PATCH] Enable SUSFS for MidoriSU-XX
+Subject: [PATCH] Enable SUSFS for KernelSU-XX
 
 ---
  kernel/Kconfig                        |  98 +++++++++++++++
