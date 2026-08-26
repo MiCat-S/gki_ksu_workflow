@@ -91,7 +91,7 @@ on:
       use_droidspaces:
         description: 'Droidspaces & NTSync'
         required: true
-        default: true
+        default: false
         type: boolean
       use_rekernel:
         description: 'Re:Kernel(-X)'
