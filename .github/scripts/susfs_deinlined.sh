@@ -167,9 +167,9 @@ def clean_body(body):
             ins_all = sum(1 for l in hunk_lines if l.startswith('+') and not l.startswith('+++'))
             dels_all = sum(1 for l in hunk_lines if l.startswith('-') and not l.startswith('---'))
 
-            ins_meaningful = sum(1 for l in hunk_lines 
+            ins_meaningful = sum(1 for l in hunk_lines
                                 if l.startswith('+') and not l.startswith('+++') and l.strip() != '+')
-            dels_meaningful = sum(1 for l in hunk_lines 
+            dels_meaningful = sum(1 for l in hunk_lines
                                  if l.startswith('-') and not l.startswith('---') and l.strip() != '-')
 
             if ins_meaningful == 0 and dels_meaningful == 0:
