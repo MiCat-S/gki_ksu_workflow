@@ -234,7 +234,10 @@ jobs:
             default_sub_level=$(echo "$config" | jq -r '.default_sub_level')
             use_lts=$(echo "$config" | jq -r '.use_lts')
             
-            if [ "$use_lts" = "false" ]; then
+            configured_sub_levels=$(echo "$config" | jq -r '.build_sub_levels[]?')
+            if [ -n "$configured_sub_levels" ]; then
+              sub_levels_to_build=$(echo "$configured_sub_levels" | sort -n | uniq | tr '\n' ' ')
+            elif [ "$use_lts" = "false" ]; then
               revisions=$(echo "$config" | jq -r '.revisions | keys[]')
               sub_levels_to_build=""
               for rev in $revisions; do
