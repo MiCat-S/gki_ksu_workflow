@@ -431,6 +431,16 @@ jobs:
             [ -f "$file" ] && [[ "$variant" =~ ^(all|$tag)$ ]] || return 0
             out "$key=- **$tag**: [\`$(short_sha "$file")\`](https://github.com/$repo/commit/$(cat "$file")) \`$(cat "${file%_commit}_date")\`"
           }
+          ksu_patch_line() {
+            local tag=$1 key=$2 prefix=$3
+            local file="commit_info/${prefix}_susfs_patch_commit"
+            [ -f "$file" ] && [[ "$variant" =~ ^(all|$tag)$ ]] || return 0
+            local repo branch sha
+            repo=$(cat "commit_info/${prefix}_susfs_patch_repo")
+            branch=$(cat "commit_info/${prefix}_susfs_patch_branch")
+            sha=$(cat "$file")
+            out "$key=- **$tag SUSFS patch**: [\`$(echo "$sha" | cut -c1-7)\`](https://github.com/$repo/commit/$sha) \`$repo:$branch\`"
+          }
           rekernel_line() {
             local label=$1 file=$2
             [ -f "$file" ] || return 0
@@ -470,6 +480,9 @@ jobs:
           ksu_line KernelSU-Official kernelsu_official "$(cat commit_info/kernelsu_official_ksu_repo 2>/dev/null)" commit_info/kernelsu_official_ksu_commit
           ksu_line ReSukiSU resukisu "$(cat commit_info/resukisu_ksu_repo 2>/dev/null)" commit_info/resukisu_ksu_commit
           ksu_line KernelSU-XX kernelsu_xx "$(cat commit_info/kernelsu_xx_ksu_repo 2>/dev/null)" commit_info/kernelsu_xx_ksu_commit
+          ksu_patch_line KowSU kowsu_susfs_patch kowsu
+          ksu_patch_line KernelSU-Next kernelsu_next_susfs_patch kernelsu_next
+          ksu_patch_line KernelSU-XX kernelsu_xx_susfs_patch kernelsu_xx
 
       - name: Publish Release
         uses: softprops/action-gh-release@v3
@@ -484,6 +497,9 @@ jobs:
             ${{ steps.ksu_info.outputs.kernelsu_official }}
             ${{ steps.ksu_info.outputs.resukisu }}
             ${{ steps.ksu_info.outputs.kernelsu_xx }}
+            ${{ steps.ksu_info.outputs.kowsu_susfs_patch }}
+            ${{ steps.ksu_info.outputs.kernelsu_next_susfs_patch }}
+            ${{ steps.ksu_info.outputs.kernelsu_xx_susfs_patch }}
             ${{ steps.ksu_info.outputs.susfs_url && format('- **SUSFS4KSU**: [{0}]({1}) {2}', steps.ksu_info.outputs.susfs_commit, steps.ksu_info.outputs.susfs_url, steps.ksu_info.outputs.susfs_date) || '' }}
             ${{ steps.ksu_info.outputs.rekernel_line }}
             ${{ steps.ksu_info.outputs.rekernel_x_line }}

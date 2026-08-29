@@ -311,14 +311,43 @@ jobs:
           else
             PATCH_VER="$KMI_VERSION"
           fi
+
+          apply_ksu_susfs_patch() {
+            local patch_branch="$1"
+            local info_prefix="$2"
+            local patch_repo="MiCat-S/KernelSU"
+            local patch_sha
+            local patch_file
+
+            patch_sha=$(git ls-remote "https://github.com/${patch_repo}.git" "refs/heads/${patch_branch}" | awk 'NR == 1 {print $1}')
+            if [ -z "$patch_sha" ]; then
+              echo "::error::Unable to resolve ${patch_repo}:${patch_branch}"
+              return 1
+            fi
+
+            patch_file="/tmp/${info_prefix}-susfs-${patch_sha}.patch"
+            curl --fail --silent --show-error --location --retry 3 --retry-delay 2 \
+              "https://github.com/${patch_repo}/commit/${patch_sha}.patch" \
+              --output "$patch_file"
+            if [ ! -s "$patch_file" ]; then
+              echo "::error::Downloaded patch is empty: ${patch_repo}@${patch_sha}"
+              return 1
+            fi
+
+            patch -p1 -d KernelSU < "$patch_file"
+            printf '%s\n' "$patch_repo" > "commit_info/${info_prefix}_susfs_patch_repo"
+            printf '%s\n' "$patch_branch" > "commit_info/${info_prefix}_susfs_patch_branch"
+            printf '%s\n' "$patch_sha" > "commit_info/${info_prefix}_susfs_patch_commit"
+          }
+
           case "${{ inputs.variant }}" in
             KowSU)
               patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
-              patch -p1 -d KernelSU < "${{ github.workspace }}/.github/patches/10_enable_susfs_for_ksu.patch"
+              apply_ksu_susfs_patch kow kowsu
               ;;
             KernelSU-Next)
               patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
-              patch -p1 -d KernelSU < "${{ github.workspace }}/.github/patches/12_enable_susfs_for_ksu.patch"
+              apply_ksu_susfs_patch next kernelsu_next
               ;;
             KernelSU-Official)
               patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
@@ -331,7 +360,7 @@ jobs:
             KernelSU-XX)
               bash "${{ github.workspace }}/.github/scripts/susfs_deinlined.sh" "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
               patch -p1 < deinlined.patch && patch -p1 < "${{ github.workspace }}/.github/patches/55_try_umount_for_susfs.patch"
-              patch -p1 -d KernelSU < "${{ github.workspace }}/.github/patches/11_enable_susfs_for_ksu.patch"
+              apply_ksu_susfs_patch xx kernelsu_xx
               ;;
           esac
 
