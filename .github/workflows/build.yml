@@ -22,6 +22,17 @@ on:
           - '6.1'
           - '6.6'
           - '6.12'
+      kernel_sublevel:
+        description: '6.12 Sublevel (ignored for 6.1/6.6)'
+        required: true
+        default: '23'
+        type: choice
+        options:
+          - '23'
+          - '38'
+          - '69'
+          - '81'
+          - '92'
       ksu_variant:
         description: 'KernelSU Variant'
         required: true
@@ -234,21 +245,25 @@ jobs:
             default_sub_level=$(echo "$config" | jq -r '.default_sub_level')
             use_lts=$(echo "$config" | jq -r '.use_lts')
             
-            configured_sub_levels=$(echo "$config" | jq -r '.build_sub_levels[]?')
-            if [ -n "$configured_sub_levels" ]; then
-              sub_levels_to_build=$(echo "$configured_sub_levels" | sort -n | uniq | tr '\n' ' ')
-            elif [ "$use_lts" = "false" ]; then
-              revisions=$(echo "$config" | jq -r '.revisions | keys[]')
-              sub_levels_to_build=""
-              for rev in $revisions; do
-                asb_date=$(echo "$config" | jq -r '.revisions["'$rev'"].asb_date')
-                if [ "$asb_date" != "lts" ]; then
-                  sub_levels_to_build="$sub_levels_to_build $rev"
-                fi
-              done
-              sub_levels_to_build=$(echo "$sub_levels_to_build" | tr ' ' '\n' | sort -n | uniq | tr '\n' ' ')
+            if [ "$kv" = "6.12" ]; then
+              sub_levels_to_build="${{ inputs.kernel_sublevel }}"
             else
-              sub_levels_to_build="$default_sub_level"
+              configured_sub_levels=$(echo "$config" | jq -r '.build_sub_levels[]?')
+              if [ -n "$configured_sub_levels" ]; then
+                sub_levels_to_build=$(echo "$configured_sub_levels" | sort -n | uniq | tr '\n' ' ')
+              elif [ "$use_lts" = "false" ]; then
+                revisions=$(echo "$config" | jq -r '.revisions | keys[]')
+                sub_levels_to_build=""
+                for rev in $revisions; do
+                  asb_date=$(echo "$config" | jq -r '.revisions["'$rev'"].asb_date')
+                  if [ "$asb_date" != "lts" ]; then
+                    sub_levels_to_build="$sub_levels_to_build $rev"
+                  fi
+                done
+                sub_levels_to_build=$(echo "$sub_levels_to_build" | tr ' ' '\n' | sort -n | uniq | tr '\n' ' ')
+              else
+                sub_levels_to_build="$default_sub_level"
+              fi
             fi
             
             for sub_level in $sub_levels_to_build; do
