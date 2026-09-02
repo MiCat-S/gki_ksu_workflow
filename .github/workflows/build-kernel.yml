@@ -285,7 +285,12 @@ jobs:
             KernelSU-XX)
               IFS=':' read -r REPO BRANCH <<< "${{ inputs.kernelsu_xx_branch }}"
               git clone --branch "${BRANCH}" "https://github.com/${REPO}.git" KernelSU
-              patch -p1 -d KernelSU --forward < "${{ github.workspace }}/.github/patches/21_extra_features_for_ksu.patch" || true
+              extra_patch="${{ github.workspace }}/.github/patches/21_extra_features_for_ksu.patch"
+              if patch -p1 -d KernelSU --dry-run --forward --batch < "$extra_patch" >/dev/null; then
+                patch -p1 -d KernelSU --forward --batch < "$extra_patch"
+              else
+                echo "::warning::Skipping incompatible KernelSU-XX metadata patch"
+              fi
               ;;
           esac
           bash "${{ github.workspace }}/.github/scripts/setup_ksu.sh"
