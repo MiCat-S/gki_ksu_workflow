@@ -100,12 +100,12 @@
       },
       "81": {
         "asb_date": "2026-06",
-        "default_r": "r22",
+        "default_r": "r23",
         "supported_r": [
-          "r22",
+          "r23",
           "none"
         ],
-        "commit": "70803f1fc929b0ce11dcce92a9754147104f4e0e",
+        "commit": "5360c214652c723e1d9c0b73aed0aebefc8b9e16",
         "commit_date": "2026-08-28 01:09:30 -0700"
       },
       "92": {
