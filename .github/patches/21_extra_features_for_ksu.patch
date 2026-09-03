@@ -1,5 +1,5 @@
 From: midori01 <lv@lvlv.lv>
-Date: Fri, 21 Aug 2026 17:03:42 +0900
+Date: Thu, 3 Sep 2026 09:06:59 +0900
 Subject: [PATCH] Enable extra features for KernelSU-XX
 
 ---
@@ -9,10 +9,10 @@ Subject: [PATCH] Enable extra features for KernelSU-XX
  3 files changed, 81 insertions(+)
 
 diff --git a/kernel/hook/branch_link_hook_arm64.c b/kernel/hook/branch_link_hook_arm64.c
-index 9acf7df62..36c74256e 100644
+index d4c1e0ee9..a8cf65219 100644
 --- a/kernel/hook/branch_link_hook_arm64.c
 +++ b/kernel/hook/branch_link_hook_arm64.c
-@@ -512,12 +512,16 @@ static int bl_hack_init_thread(void *data)
+@@ -519,12 +519,16 @@ static int bl_hack_init_thread(void *data)
  {
  	set_user_nice(current, 19); // low prio
  
