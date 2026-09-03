@@ -65,7 +65,9 @@
     "use_lts": false,
     "build_sub_levels": [
       "23",
-      "69"
+      "69",
+      "81",
+      "92"
     ],
     "revisions": {
       "23": {
