@@ -35,6 +35,21 @@ done
 
 NEEDS_COMMIT=false
 
+resolve_default_sub_level() {
+  local current_default="$1"
+  local current_sub="$2"
+  local new_sub="$3"
+  local use_lts="$4"
+
+  if [[ "$use_lts" == "true" ]]; then
+    printf '%s\n' "$current_default"
+  elif [[ "$current_sub" == "$current_default" && "$new_sub" != "$current_sub" ]]; then
+    printf '%s\n' "$new_sub"
+  else
+    printf '%s\n' "$current_default"
+  fi
+}
+
 echo "=== Checking kernel versions: ${KERNEL_VERSIONS[*]} ==="
 echo "=== Fetching refs from AOSP common kernel ==="
 git ls-remote https://android.googlesource.com/kernel/common.git 2>/dev/null > "$TMP_DIR/all_refs.txt"
@@ -255,15 +270,17 @@ check_tag() {
 
       local commit_date=$(get_commit_date "$head_commit")
 
-      local new_default="$new_sub"
       local current_default=$(jq -r ".[\"$kv\"].default_sub_level" "$CONFIG_FILE")
       local use_lts=$(jq -r ".[\"$kv\"].use_lts // false" "$CONFIG_FILE")
+      local new_default
+      new_default=$(resolve_default_sub_level "$current_default" "$current_sub" "$new_sub" "$use_lts")
       if [[ "$use_lts" == "true" ]]; then
-        new_default="$current_default"
         echo "  use_lts=true, keeping default_sub_level=$current_default."
-      elif [[ "$new_sub" -lt "$current_default" ]]; then
-        new_default="$current_default"
-        echo "  New sub ($new_sub) < current default ($current_default), keeping default."
+      elif [[ "$current_sub" == "$current_default" && "$new_sub" != "$current_sub" ]]; then
+        new_default="$new_sub"
+        echo "  Default revision migrated: $current_sub -> $new_sub."
+      else
+        echo "  Keeping configured default_sub_level=$current_default."
       fi
 
       if [[ "$new_sub" != "$current_sub" ]]; then
@@ -349,15 +366,17 @@ check_tag() {
   fi
 
   local use_lts=$(jq -r ".[\"$kv\"].use_lts // false" "$CONFIG_FILE")
-  local new_default="$new_sub"
   local current_default=$(jq -r ".[\"$kv\"].default_sub_level" "$CONFIG_FILE")
+  local new_default
+  new_default=$(resolve_default_sub_level "$current_default" "$current_sub" "$new_sub" "$use_lts")
 
   if [[ "$use_lts" == "true" ]]; then
-    new_default="$current_default"
     echo "  use_lts=true, keeping default_sub_level=$current_default."
-  elif [[ "$new_sub" -lt "$current_default" ]]; then
-    new_default="$current_default"
-    echo "  Tag sub_level ($new_sub) < current default ($current_default), keeping default_sub_level."
+  elif [[ "$current_sub" == "$current_default" && "$new_sub" != "$current_sub" ]]; then
+    new_default="$new_sub"
+    echo "  Default revision migrated: $current_sub -> $new_sub."
+  else
+    echo "  Keeping configured default_sub_level=$current_default."
   fi
 
   if download_and_upload_tag "source-$kv" "$tar_name"; then

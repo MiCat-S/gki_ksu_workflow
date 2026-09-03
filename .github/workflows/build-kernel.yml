@@ -274,8 +274,12 @@ jobs:
             KernelSU-Official)
               IFS=':' read -r REPO BRANCH <<< "${{ inputs.kernelsu_official_branch }}"
               git clone --branch "${BRANCH}" "https://github.com/${REPO}.git" KernelSU
-              patch -p1 -d KernelSU --forward < "${{ github.workspace }}/.github/patches/20_extra_features_for_ksu.patch" || true
-              [ "${{ inputs.use_susfs }}" != "true" ] && patch -p1 -d KernelSU --forward < "${{ github.workspace }}/.github/patches/31_ksu_toolkit_for_ksu.patch" || true
+              extra_patch="${{ github.workspace }}/.github/patches/20_extra_features_for_ksu.patch"
+              if patch -p1 -d KernelSU --dry-run --forward --batch < "$extra_patch" >/dev/null 2>&1; then
+                patch -p1 -d KernelSU --forward --batch < "$extra_patch"
+              else
+                echo "::warning::Skipping incompatible KernelSU Official metadata patch"
+              fi
               ;;
             ReSukiSU)
               IFS=':' read -r REPO BRANCH <<< "${{ inputs.resukisu_branch }}"
@@ -357,7 +361,6 @@ jobs:
             KernelSU-Official)
               patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
               patch -p1 -d KernelSU < "$SUSFS_DIR/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-              patch -p1 -d KernelSU < "${{ github.workspace }}/.github/patches/30_ksu_toolkit_for_ksu.patch"
               ;;
             ReSukiSU)
               patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
@@ -368,6 +371,30 @@ jobs:
               apply_ksu_susfs_patch xx kernelsu_xx
               ;;
           esac
+
+      - name: Apply KernelSU Official Toolkit
+        if: inputs.variant == 'KernelSU-Official'
+        working-directory: kernel_workspace/common
+        run: |
+          toolkit_patch="${{ github.workspace }}/.github/patches/30_ksu_toolkit_for_ksu.patch"
+          debris_before=$(find KernelSU -type f \( -name '*.rej' -o -name '*.orig' \) -print | sort)
+          if ! git -C KernelSU apply --check "$toolkit_patch"; then
+            echo "::error::KernelSU Official toolkit patch failed git apply validation"
+            exit 1
+          fi
+          if ! patch -p1 -d KernelSU --dry-run --forward --batch --fuzz=0 \
+            --no-backup-if-mismatch < "$toolkit_patch"; then
+            echo "::error::KernelSU Official toolkit patch is incompatible with the prepared source tree"
+            exit 1
+          fi
+          patch -p1 -d KernelSU --forward --batch --fuzz=0 \
+            --no-backup-if-mismatch < "$toolkit_patch"
+          debris_after=$(find KernelSU -type f \( -name '*.rej' -o -name '*.orig' \) -print | sort)
+          if [ "$debris_after" != "$debris_before" ]; then
+            echo "::error::KernelSU Official toolkit patch created reject or backup files"
+            [ -n "$debris_after" ] && printf '%s\n' "$debris_after"
+            exit 1
+          fi
 
       - name: Setup Manual Hooks
         if: >-
@@ -537,6 +564,98 @@ jobs:
           make -j$(nproc) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig
           make -j$(nproc) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
           [ "${{ inputs.use_ccache }}" = "true" ] && ccache -s || true
+
+      - name: Verify KernelSU Official Toolkit symbols
+        if: inputs.variant == 'KernelSU-Official'
+        working-directory: kernel_workspace/common
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VMLINUX="out/vmlinux"
+          SYSTEM_MAP="out/System.map"
+          LLVM_NM="${{ github.workspace }}/kernel_workspace/clang/bin/llvm-nm"
+          LLVM_OBJDUMP="${{ github.workspace }}/kernel_workspace/clang/bin/llvm-objdump"
+          VMLINUX_SYMBOLS="${RUNNER_TEMP}/vmlinux.symbols"
+          SYSTEM_MAP_SYMBOLS="${RUNNER_TEMP}/system-map.symbols"
+          DIRECT_CALLS="${RUNNER_TEMP}/vmlinux-direct-calls"
+
+          test -s "$VMLINUX" || { echo "::error::Missing $VMLINUX"; exit 1; }
+          test -s "$SYSTEM_MAP" || { echo "::error::Missing $SYSTEM_MAP"; exit 1; }
+          test -x "$LLVM_NM" || { echo "::error::Missing llvm-nm: $LLVM_NM"; exit 1; }
+          test -x "$LLVM_OBJDUMP" || { echo "::error::Missing llvm-objdump: $LLVM_OBJDUMP"; exit 1; }
+
+          grep -Fqx 'CONFIG_KSU=y' out/.config || {
+            echo "::error::KernelSU is not built in"
+            exit 1
+          }
+          grep -Fqx 'CONFIG_KPROBES=y' out/.config || {
+            echo "::error::KernelSU Official Toolkit requires CONFIG_KPROBES=y"
+            exit 1
+          }
+
+          required_symbols=(
+            __arm64_sys_reboot
+            ksu_sulog_emit_grant_root
+            ksu_sulog_capture_sucompat
+            ksu_toolkit_init
+            ksu_toolkit_exit
+          )
+          required_call_targets=(
+            ksu_sulog_emit_grant_root
+            ksu_sulog_capture_sucompat
+            ksu_toolkit_init
+            ksu_toolkit_exit
+          )
+
+          if [ "${{ inputs.use_susfs }}" = "true" ]; then
+            grep -Fqx 'CONFIG_KSU_SUSFS=y' out/.config || {
+              echo "::error::SUSFS was requested but CONFIG_KSU_SUSFS is not enabled"
+              exit 1
+            }
+            required_symbols+=(ksu_handle_faccessat ksu_handle_stat)
+            required_call_targets+=(ksu_handle_faccessat ksu_handle_stat)
+          else
+            required_symbols+=(
+              ksu_handle_faccessat_sucompat
+              ksu_handle_stat_sucompat
+              ksu_toolkit_is_ksud_exists
+            )
+            required_call_targets+=(
+              ksu_handle_faccessat_sucompat
+              ksu_handle_stat_sucompat
+              ksu_toolkit_is_ksud_exists
+            )
+          fi
+
+          "$LLVM_NM" --defined-only --format=posix "$VMLINUX" |
+            awk 'NF { print $1 }' > "$VMLINUX_SYMBOLS"
+          awk 'NF >= 3 { print $3 }' "$SYSTEM_MAP" > "$SYSTEM_MAP_SYMBOLS"
+          "$LLVM_OBJDUMP" --disassemble --no-show-raw-insn "$VMLINUX" |
+            awk '$0 ~ /[[:space:]](b|bl)[[:space:]]/ && $0 ~ /</ { print }' > "$DIRECT_CALLS"
+
+          failed=0
+          for symbol in "${required_symbols[@]}"; do
+            if ! grep -Fqx "$symbol" "$VMLINUX_SYMBOLS"; then
+              echo "::error::$symbol is missing from vmlinux"
+              failed=1
+            fi
+            if ! grep -Fqx "$symbol" "$SYSTEM_MAP_SYMBOLS"; then
+              echo "::error::$symbol is missing from System.map"
+              failed=1
+            fi
+          done
+
+          for symbol in "${required_call_targets[@]}"; do
+            if ! grep -Fq "<$symbol>" "$DIRECT_CALLS"; then
+              echo "::error::No direct call reaches $symbol; ThinLTO may have bypassed its probe"
+              failed=1
+            fi
+          done
+
+          [ "$failed" -eq 0 ] || exit 1
+          printf 'Verified %d Toolkit symbols and %d direct call targets\n' \
+            "${#required_symbols[@]}" "${#required_call_targets[@]}"
 
       - name: Export vmlinux for eBPF
         if: inputs.upload_vmlinux

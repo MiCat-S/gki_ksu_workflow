@@ -534,5 +534,5 @@ jobs:
 
   cleanup:
     needs: release
-    if: success() || failure()
+    if: inputs.cleanup_tags && (success() || failure())
     uses: ./.github/workflows/cleanup-tags.yml
