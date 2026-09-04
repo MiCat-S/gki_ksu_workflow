@@ -20,7 +20,7 @@ index 294c75b9b..39d9f486c 100644
 +    struct ksu_hook_type_cmd cmd = { 0 };
 +
 +#ifdef CONFIG_KSU_SUSFS
-+    const char *type = "Inline";
++    const char *type = "De-inlined SUSFS";
 +#else
 +    const char *type = "Kprobes";
 +#endif
