@@ -365,6 +365,74 @@ jobs:
       ksu_debug: ${{ inputs.ksu_debug }}
       upload_vmlinux: ${{ inputs.upload_vmlinux }}
 
+  validate-xx-companion:
+    if: inputs.ksu_variant == 'KernelSU-XX'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout XX candidate
+        uses: actions/checkout@v7
+        with:
+          repository: MiCat-S/KernelSU
+          ref: codex/xx-rebase-e92e1ad7d
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Setup Rust
+        run: |
+          rustup update stable
+          rustup component add clippy rustfmt
+          rustup target add aarch64-linux-android
+
+      - uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r29
+
+      - name: Check and build ksud
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          source .github/scripts/setup-rust-build.sh aarch64-linux-android 26
+          cargo check --target "$TRIPLE" --manifest-path userspace/ksud/Cargo.toml
+          cargo clippy --target "$TRIPLE" --manifest-path userspace/ksud/Cargo.toml -- -D warnings
+          cargo fmt --manifest-path userspace/ksud/Cargo.toml --check
+          cargo build --target "$TRIPLE" --release --manifest-path userspace/ksud/Cargo.toml
+          mkdir -p manager/app/src/main/jniLibs/arm64-v8a
+          cp target/aarch64-linux-android/release/ksud manager/app/src/main/jniLibs/arm64-v8a/libksud.so
+
+      - name: Configure validation signing
+        working-directory: manager
+        run: |
+          {
+            echo KEYSTORE_PASSWORD='password'
+            echo KEY_ALIAS='alias'
+            echo KEY_PASSWORD='password'
+            echo KEYSTORE_FILE='dummy.keystore'
+          } >> gradle.properties
+
+      - name: Build Manager
+        working-directory: manager
+        run: ./gradlew clean assembleRelease --stacktrace
+
+      - name: Upload companion artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: xx-e92e1ad7-companion
+          path: |
+            target/aarch64-linux-android/release/ksud
+            manager/app/build/outputs/apk/release/*.apk
+
   release:
     needs: [setup, build]
     if: |
