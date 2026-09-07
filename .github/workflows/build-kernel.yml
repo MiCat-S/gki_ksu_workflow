@@ -289,8 +289,8 @@ jobs:
             KernelSU-XX)
               IFS=':' read -r REPO BRANCH <<< "${{ inputs.kernelsu_xx_branch }}"
               git clone --branch "${BRANCH}" "https://github.com/${REPO}.git" KernelSU
-              git -C KernelSU fetch origin 649e4a7c76850303548f12cc0b87e9b0580e8d77
-              git -C KernelSU checkout --detach 649e4a7c76850303548f12cc0b87e9b0580e8d77
+              git -C KernelSU fetch origin a13436ca7befd8ea62baeaec82b8e2d2d285a2bc
+              git -C KernelSU checkout --detach a13436ca7befd8ea62baeaec82b8e2d2d285a2bc
               extra_patch="${{ github.workspace }}/.github/patches/21_extra_features_for_ksu.patch"
               if patch -p1 -d KernelSU --dry-run --forward --batch < "$extra_patch" >/dev/null; then
                 patch -p1 -d KernelSU --forward --batch < "$extra_patch"
@@ -371,7 +371,7 @@ jobs:
             KernelSU-XX)
               bash "${{ github.workspace }}/.github/scripts/susfs_deinlined.sh" "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
               patch -p1 < deinlined.patch && patch -p1 < "${{ github.workspace }}/.github/patches/55_try_umount_for_susfs.patch"
-              apply_ksu_susfs_patch codex/xx-rebase-e92e1ad7d kernelsu_xx
+              apply_ksu_susfs_patch codex/xx-a13436ca7 kernelsu_xx
               ;;
           esac
 

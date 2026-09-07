@@ -373,7 +373,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: MiCat-S/KernelSU
-          ref: codex/xx-rebase-e92e1ad7d
+          ref: codex/xx-a13436ca7
           fetch-depth: 0
 
       - name: Setup Java
@@ -428,7 +428,7 @@ jobs:
       - name: Upload companion artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: xx-649e4a7-companion
+          name: xx-a13436ca7-companion
           path: |
             target/aarch64-linux-android/release/ksud
             manager/app/build/outputs/apk/release/*.apk
