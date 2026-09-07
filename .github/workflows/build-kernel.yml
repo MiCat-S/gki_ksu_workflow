@@ -289,8 +289,8 @@ jobs:
             KernelSU-XX)
               IFS=':' read -r REPO BRANCH <<< "${{ inputs.kernelsu_xx_branch }}"
               git clone --branch "${BRANCH}" "https://github.com/${REPO}.git" KernelSU
-              git -C KernelSU fetch origin e92e1ad7dd2a6d80042e562299973e32836f22ed
-              git -C KernelSU checkout --detach e92e1ad7dd2a6d80042e562299973e32836f22ed
+              git -C KernelSU fetch origin 649e4a7c76850303548f12cc0b87e9b0580e8d77
+              git -C KernelSU checkout --detach 649e4a7c76850303548f12cc0b87e9b0580e8d77
               extra_patch="${{ github.workspace }}/.github/patches/21_extra_features_for_ksu.patch"
               if patch -p1 -d KernelSU --dry-run --forward --batch < "$extra_patch" >/dev/null; then
                 patch -p1 -d KernelSU --forward --batch < "$extra_patch"
