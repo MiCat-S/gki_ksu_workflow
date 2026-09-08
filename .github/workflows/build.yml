@@ -407,12 +407,13 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
+          export ANDROID_NDK_ROOT="$ANDROID_NDK_HOME"
           toolchain="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64"
           export BINDGEN_EXTRA_CLANG_ARGS_aarch64_linux_android="--sysroot=$toolchain/sysroot -I$toolchain/sysroot/usr/include/aarch64-linux-android -I$toolchain/sysroot/usr/include"
-          cargo ndk -t arm64-v8a -p 26 check
-          cargo ndk -t arm64-v8a -p 26 clippy -- -D warnings
+          cargo ndk -t arm64-v8a --platform 26 check
+          cargo ndk -t arm64-v8a --platform 26 clippy -- -D warnings
           cargo fmt --check
-          cargo ndk -t arm64-v8a -p 26 build --release
+          cargo ndk -t arm64-v8a --platform 26 build --release
           mkdir -p ../../manager/app/src/main/jniLibs/arm64-v8a
           cp target/aarch64-linux-android/release/ksud ../../manager/app/src/main/jniLibs/arm64-v8a/libksud.so
 
