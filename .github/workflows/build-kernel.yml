@@ -343,7 +343,16 @@ jobs:
               return 1
             fi
 
-            patch -p1 -d KernelSU < "$patch_file"
+            if ! patch -p1 -d KernelSU --dry-run --forward --batch \
+              --no-backup-if-mismatch < "$patch_file"; then
+              echo "::error::SUSFS patch is incompatible with the prepared source tree: ${patch_repo}@${patch_sha}"
+              return 1
+            fi
+            if ! patch -p1 -d KernelSU --forward --batch \
+              --no-backup-if-mismatch < "$patch_file"; then
+              echo "::error::Failed to apply SUSFS patch: ${patch_repo}@${patch_sha}"
+              return 1
+            fi
             printf '%s\n' "$patch_repo" > "commit_info/${info_prefix}_susfs_patch_repo"
             printf '%s\n' "$patch_branch" > "commit_info/${info_prefix}_susfs_patch_branch"
             printf '%s\n' "$patch_sha" > "commit_info/${info_prefix}_susfs_patch_commit"
