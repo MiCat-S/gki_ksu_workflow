@@ -269,6 +269,8 @@ jobs:
             KernelSU-Next)
               IFS=':' read -r REPO BRANCH <<< "${{ inputs.kernelsu_next_branch }}"
               git clone --branch "${BRANCH}" "https://github.com/${REPO}.git" KernelSU
+              git -C KernelSU fetch origin 8b9d7a7a9cd4a45a6b297817a0925031bc9454a9
+              git -C KernelSU checkout --detach 8b9d7a7a9cd4a45a6b297817a0925031bc9454a9
               patch -p1 -d KernelSU --forward < "${{ github.workspace }}/.github/patches/22_extra_features_for_ksu.patch" || true
               ;;
             KernelSU-Official)
@@ -366,7 +368,7 @@ jobs:
               ;;
             KernelSU-Next)
               patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
-              apply_ksu_susfs_patch next kernelsu_next
+              apply_ksu_susfs_patch codex/next-8b9d7a7a9 kernelsu_next
               ;;
             KernelSU-Official)
               patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
