@@ -368,7 +368,7 @@ jobs:
               ;;
             KernelSU-Next)
               patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
-            apply_ksu_susfs_patch codex/next-8b9d7a7a9-v2 kernelsu_next
+            apply_ksu_susfs_patch codex/next-8b9d7a7a9-v3 kernelsu_next
               ;;
             KernelSU-Official)
               patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"

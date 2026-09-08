@@ -373,7 +373,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: MiCat-S/KernelSU
-          ref: codex/next-8b9d7a7a9-v2
+          ref: codex/next-8b9d7a7a9-v3
           fetch-depth: 0
 
       - name: Setup Java
