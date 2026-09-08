@@ -289,8 +289,8 @@ jobs:
             KernelSU-XX)
               IFS=':' read -r REPO BRANCH <<< "${{ inputs.kernelsu_xx_branch }}"
               git clone --branch "${BRANCH}" "https://github.com/${REPO}.git" KernelSU
-              git -C KernelSU fetch origin a13436ca7befd8ea62baeaec82b8e2d2d285a2bc
-              git -C KernelSU checkout --detach a13436ca7befd8ea62baeaec82b8e2d2d285a2bc
+              git -C KernelSU fetch origin bc20d67a329127d971a608d8e33db72f1fc49f13
+              git -C KernelSU checkout --detach bc20d67a329127d971a608d8e33db72f1fc49f13
               extra_patch="${{ github.workspace }}/.github/patches/21_extra_features_for_ksu.patch"
               if patch -p1 -d KernelSU --dry-run --forward --batch < "$extra_patch" >/dev/null; then
                 patch -p1 -d KernelSU --forward --batch < "$extra_patch"
@@ -345,7 +345,16 @@ jobs:
               return 1
             fi
 
-            patch -p1 -d KernelSU < "$patch_file"
+            if ! patch -p1 -d KernelSU --dry-run --forward --batch \
+              --no-backup-if-mismatch < "$patch_file"; then
+              echo "::error::SUSFS patch is incompatible with the prepared source tree: ${patch_repo}@${patch_sha}"
+              return 1
+            fi
+            if ! patch -p1 -d KernelSU --forward --batch \
+              --no-backup-if-mismatch < "$patch_file"; then
+              echo "::error::Failed to apply SUSFS patch: ${patch_repo}@${patch_sha}"
+              return 1
+            fi
             printf '%s\n' "$patch_repo" > "commit_info/${info_prefix}_susfs_patch_repo"
             printf '%s\n' "$patch_branch" > "commit_info/${info_prefix}_susfs_patch_branch"
             printf '%s\n' "$patch_sha" > "commit_info/${info_prefix}_susfs_patch_commit"
@@ -371,7 +380,7 @@ jobs:
             KernelSU-XX)
               bash "${{ github.workspace }}/.github/scripts/susfs_deinlined.sh" "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
               patch -p1 < deinlined.patch && patch -p1 < "${{ github.workspace }}/.github/patches/55_try_umount_for_susfs.patch"
-              apply_ksu_susfs_patch codex/xx-a13436ca7 kernelsu_xx
+              apply_ksu_susfs_patch codex/xx-bc20d67a3 kernelsu_xx
               ;;
           esac
 
