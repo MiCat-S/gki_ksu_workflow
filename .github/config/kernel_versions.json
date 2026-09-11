@@ -50,8 +50,8 @@
         "supported_r": [
           "r00"
         ],
-        "commit": "1736274457ce3222bd1b60b9b7d8ecccc2fd0f25",
-        "commit_date": "2026-09-09 09:09:05 +0000"
+        "commit": "76b6c9e5475dc599bff99b36af787853a22e8724",
+        "commit_date": "2026-09-10 14:21:33 +0000"
       }
     },
     "default_clang": "r510928",
