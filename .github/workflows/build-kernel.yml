@@ -103,7 +103,7 @@ jobs:
       ZRAM_SUFFIX: ${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-LZ4ZSTD' || '' }}
       CCACHE_DIR: ${{ github.workspace }}/.ccache-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ inputs.use_susfs && '-susfs' || '' }}${{ inputs.use_droidspaces && '-ds' || '' }}${{ inputs.use_adios && inputs.kernel_version != '6.1' && '-adios' || '' }}${{ inputs.use_lz4_zstd && inputs.kernel_version == '6.12' && '-lz4-zstd' || '' }}
       CCACHE_COMPILERCHECK: content
-      CCACHE_SLOPPINESS: file_macro,time_macros,include_file_mtime,include_file_ctime
+      CCACHE_SLOPPINESS: file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,modules
 
     steps:
       - name: Checkout Repository
@@ -167,11 +167,8 @@ jobs:
             -o hash_dir=false \
             -o compiler_check=content \
             -o "sloppiness=file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,modules" \
-            -o depend_mode=true \
-            -o run_second_cpp=true \
             -o compression=true \
             -o compression_level=1 \
-            -o keep_comments_cpp=true \
             -o "cache_dir=${{ env.CCACHE_DIR }}" \
             -o "base_dir=${{ github.workspace }}" \
             -o file_clone=false \
