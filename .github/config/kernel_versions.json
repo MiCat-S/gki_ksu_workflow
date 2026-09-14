@@ -36,13 +36,13 @@
     "revisions": {
       "139": {
         "asb_date": "2026-07",
-        "default_r": "r7",
+        "default_r": "r8",
         "supported_r": [
-          "r7",
+          "r8",
           "none"
         ],
-        "commit": "4a3f51897142e0636640f7198cb964c9e435faa9",
-        "commit_date": "2026-08-31 15:34:27 -0700"
+        "commit": "58344949eedf2ab857ccc4c6735fa7df4a208dfb",
+        "commit_date": "2026-09-08 23:39:00 -0700"
       },
       "143": {
         "asb_date": "lts",
