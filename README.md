@@ -33,6 +33,12 @@ This repository implements a unified, config-driven build orchestration system t
 
 All kernel version-specific settings are centralized in [`.github/config/kernel_versions.json`](.github/config/kernel_versions.json). A single `kernel_version` input at workflow dispatch drives the entire build matrix — including Kernel version, Sublevel, Compiler, Rust availability, and AnyKernel3 branch selection.
 
+This fork builds immutable, reviewed source combinations from
+[`.github/config/ksu-stacks.json`](.github/config/ksu-stacks.json). A blank
+`susfs_commit` selects the pinned KMI-specific commit, not the latest upstream
+revision. Unreviewed source/SUSFS combinations are rejected before building.
+See [Reviewed Stacks](docs/REVIEWED_STACKS.md) for updates and acceptance coverage.
+
 ---
 
 ## 📦 Build Variants
@@ -41,32 +47,32 @@ All kernel version-specific settings are centralized in [`.github/config/kernel_
 | :--- | :---: | :---: | :--- |
 | [KowSU](https://github.com/KOWX712/KernelSU) | ❌ | ❌ | `Kprobes` |
 | [KowSU-DS](https://github.com/KOWX712/KernelSU) | ❌ | ✅ | `Kprobes` |
-| [KowSU-SUSFS](https://github.com/KOWX712/KernelSU) | ✅ | ❌ | `Inline` |
-| [KowSU-SUSFS-DS](https://github.com/KOWX712/KernelSU) | ✅ | ✅ | `Inline` |
+| [KowSU-SUSFS](https://github.com/KOWX712/KernelSU) | ✅ | ❌ | `De-inlined` |
+| [KowSU-SUSFS-DS](https://github.com/KOWX712/KernelSU) | ✅ | ✅ | `De-inlined` |
 | [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ❌ | `Tracepoint` |
 | [KernelSU-Next-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ✅ | `Tracepoint` |
-| [KernelSU-Next-SUSFS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ❌ | `Inline` |
-| [KernelSU-Next-SUSFS-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ✅ | `Inline` |
+| [KernelSU-Next-SUSFS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ❌ | `De-inlined` |
+| [KernelSU-Next-SUSFS-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ✅ | `De-inlined` |
 | [KernelSU-Official](https://github.com/tiann/KernelSU) | ❌ | ❌ | `Kprobes` |
 | [KernelSU-Official-DS](https://github.com/tiann/KernelSU) | ❌ | ✅ | `Kprobes` |
-| [KernelSU-Official-SUSFS](https://github.com/tiann/KernelSU) | ✅ | ❌ | `Inline` |
-| [KernelSU-Official-SUSFS-DS](https://github.com/tiann/KernelSU) | ✅ | ✅ | `Inline` |
-| [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ❌ | `Manual` |
-| [ReSukiSU-DS](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ✅ | `Manual` |
-| [ReSukiSU-SUSFS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ❌ | `Inline` |
-| [ReSukiSU-SUSFS-DS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ✅ | `Inline` |
+| [KernelSU-Official-SUSFS](https://github.com/tiann/KernelSU) | ✅ | ❌ | `De-inlined` |
+| [KernelSU-Official-SUSFS-DS](https://github.com/tiann/KernelSU) | ✅ | ✅ | `De-inlined` |
+| [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ❌ | `Manual` / `Tracepoint` |
+| [ReSukiSU-DS](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ✅ | `Manual` / `Tracepoint` |
+| [ReSukiSU-SUSFS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ❌ | `De-inlined` |
+| [ReSukiSU-SUSFS-DS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ✅ | `De-inlined` |
 | [KernelSU-XX](https://github.com/backslashxx/KernelSU) | ❌ | ❌ | `Hookless` |
 | [KernelSU-XX-DS](https://github.com/backslashxx/KernelSU) | ❌ | ✅ | `Hookless` |
 | [KernelSU-XX-SUSFS](https://github.com/backslashxx/KernelSU) | ✅ | ❌ | `De-inlined` |
 | [KernelSU-XX-SUSFS-DS](https://github.com/backslashxx/KernelSU) | ✅ | ✅ | `De-inlined` |
 
-> \* **KernelSU-XX & ReSukiSU Hook Type:** Runtime-configurable via `hook_mode`.
+> \* **KernelSU-XX & ReSukiSU Hook Type:** Selected at build time via `hook_mode`, independently of SUSFS.
 > - `hookless` — default for KernelSU-XX; uses `CONFIG_KSU_HACK_ARM64_BRANCH_LINK` on all kernel versions
-> - `manual` — default for ReSukiSU
+> - `manual` — available for KernelSU-XX and ReSukiSU; the default XX-only hookless selection maps ReSukiSU to `tracepoint`
 > - `tracepoint` — ReSukiSU only
 
 > [!TIP]
-> **Matrix Build Orchestration:** The matrix always produces exactly **1 artifact per variant** — the enabled features (Droidspaces and/or SUSFS) are applied to that single artifact. With all 5 variants selected, this yields **5 builds per active sublevel for each kernel version**. Choosing `all` from the `kernel_version` dropdown compiles the active sublevels across 6.1, 6.6 and 6.12 in parallel for a total of **20 concurrent jobs**.
+> **Matrix Build Orchestration:** Normal builds produce one kernel artifact per selected variant and sublevel. Kernel 6.12 uses the selected `kernel_sublevel` (default `23`). The separate `validate-stack` mode runs 48 representative kernel builds, 10 Android companion builds and one paired SUSFS module build without publishing a release.
 
 ---
 
@@ -82,9 +88,9 @@ Use the manager distributed by the selected upstream: [KowSU](https://github.com
 | :--- | :--- |
 | `Kprobes` | Dynamically instruments kernel functions at runtime via kprobe breakpoints. Minimal kernel footprint, broad compatibility. **Default for KowSU and KernelSU Official** (non-SUSFS). |
 | `Tracepoint` | Hooks into the kernel's static syscall tracepoint infrastructure (`sys_enter`/`sys_exit`) without modifying kernel source. **Default for KernelSU-Next** (non-SUSFS). |
-| `Inline` | Compile-time injection via `#ifdef CONFIG_KSU_SUSFS` blocks embedded directly into kernel subsystem source. Uses `static_key` branches for runtime toggling. No reliance on kprobes or LSM hooks. Hardwired into VFS (`exec`, `open`, `stat`, `readdir`, `statfs`), SELinux (`avc`, `hooks`, `services`), input, mounts, and procfs. **Used by the KowSU, KernelSU-Next, ReSukiSU, and KernelSU Official SUSFS builds.** |
-| `De-inlined` | SUSFS hooks applied via kernel source patching rather than inline `#ifdef CONFIG_KSU_SUSFS` blocks. Cleaner separation of SUSFS logic from core kernel subsystems. **Used by KernelSU-XX-SUSFS.** |
-| `Manual` | Static kernel source patching. Custom hooks injected at compile time into core kernel subsystems. **Default for ReSukiSU** (non-SUSFS). |
+| `Inline` | Legacy integration with KernelSU call sites embedded in the SUSFS kernel patch. Not used by the reviewed stacks in this fork. |
+| `De-inlined` | Removes legacy inline KernelSU call sites from the reviewed SUSFS patch while retaining SUSFS filesystem changes. KernelSU uses its own hook mechanism and supplies the paired SUSFS callbacks. **Used for SUSFS integration by all five variants.** |
+| `Manual` | Explicit KernelSU hooks applied as kernel source patches. Selectable for ReSukiSU and KernelSU-XX with SUSFS either on or off. |
 | `Hookless` | Pure KernelSU built-in mechanisms. Always enables `CONFIG_KSU_HACK_ARM64_BRANCH_LINK` regardless of kernel version. Zero kernel source modification. Relies entirely on KernelSU's internal hooking infrastructure. **Default for KernelSU-XX** (non-SUSFS). |
 
 ---
@@ -95,7 +101,7 @@ Use the manager distributed by the selected upstream: [KowSU](https://github.com
 | :--- | :--- |
 | **Kernel Version** | Select `6.1`, `6.6`, `6.12`, or `all` to compile one or all kernel versions. Sublevel, revision, compiler, and Rust settings are auto-resolved from the centralized config. |
 | **Source Mirror** | Choose between Google's official AOSP mirror or a self-hosted mirror for kernel source and toolchain downloads. |
-| **SUSFS Module** | When SUSFS is enabled, automatically fetches the latest [susfs4ksu-module](https://github.com/sidex15/susfs4ksu-module) and attaches it to the release. A single `susfs_commit` input controls SUSFS versions across variants. |
+| **SUSFS Module** | Builds the paired ARM64 tool from pinned source, checks its ABI against the three SUSFS profiles, and packages it with the pinned module. Installation and the binary update action use the same hash-verified bundled tool, not a mutable latest binary. |
 | **KSU Toolkit** | Automatically fetches the latest [ksu_toolkit](https://github.com/backslashxx/ksu_toolkit) module from nightly.link and attaches it to the release. |
 | **Droidspaces** | Container support via [Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS) — SYSVIPC, IPC_NS, PID_NS, DEVTMPFS, NTSync, and networking. Enabled per-variant through the `use_droidspaces` toggle. |
 | **Re:Kernel(-X)** | Integrated [Re:Kernel](https://github.com/Sakion-Team/Re-Kernel) and [Re:Kernel-X](https://github.com/myflavor/ReKernel-X) modules compiled directly into the kernel. Provides tombstone freeze recovery, network-triggered unfreeze, and binder async cleanup. Toggled via `use_rekernel` switch. |
@@ -109,7 +115,7 @@ Use the manager distributed by the selected upstream: [KowSU](https://github.com
 
 ## ✅ Tested Devices
 
-The following devices have been confirmed to work with kernels built by this workflow:
+The following list records earlier device reports. It does not establish hardware compatibility for the reviewed SUSFS migration; this migration has no new device-testing claim.
 
 | Brand | Model |
 | :--- | :--- |
@@ -121,7 +127,7 @@ The following devices have been confirmed to work with kernels built by this wor
 > [!NOTE]
 > **Compatibility Notes:**
 > - All listed devices run Android 16+ with GKI kernels (6.1/6.6/6.12)
-> - SUSFS and Droidspaces features have been tested on all device families
+> - CI compilation and artifact verification do not replace device testing
 > - Users on stock ROMs are advised to flash the kernel via the manager provided by their selected KernelSU variant or Kernel Flasher
 
 > [!TIP]

@@ -33,6 +33,11 @@
 
 所有内核版本相关的设置都集中存放在 [`.github/config/kernel_versions.json`](.github/config/kernel_versions.json) 中。只需在工作流触发时提供 `kernel_version` 这一个输入参数，即可驱动整个构建矩阵——包括内核版本、子版本、编译器、Rust 可用性以及 AnyKernel3 分支选择。
 
+本分支通过 [`.github/config/ksu-stacks.json`](.github/config/ksu-stacks.json)
+固定审查过的完整源码组合。`susfs_commit` 留空使用对应 KMI 的固定提交，
+不再跟随上游最新版本；未经审查的源码与 SUSFS 组合会在构建前被拒绝。
+更新方式与验收范围见 [Reviewed Stacks](docs/REVIEWED_STACKS.md)。
+
 ---
 
 ## 📦 构建变体
@@ -41,32 +46,32 @@
 | :--- | :---: | :---: | :--- |
 | [KowSU](https://github.com/KOWX712/KernelSU) | ❌ | ❌ | `Kprobes` |
 | [KowSU-DS](https://github.com/KOWX712/KernelSU) | ❌ | ✅ | `Kprobes` |
-| [KowSU-SUSFS](https://github.com/KOWX712/KernelSU) | ✅ | ❌ | `Inline` |
-| [KowSU-SUSFS-DS](https://github.com/KOWX712/KernelSU) | ✅ | ✅ | `Inline` |
+| [KowSU-SUSFS](https://github.com/KOWX712/KernelSU) | ✅ | ❌ | `De-inlined` |
+| [KowSU-SUSFS-DS](https://github.com/KOWX712/KernelSU) | ✅ | ✅ | `De-inlined` |
 | [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ❌ | `Tracepoint` |
 | [KernelSU-Next-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ✅ | `Tracepoint` |
-| [KernelSU-Next-SUSFS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ❌ | `Inline` |
-| [KernelSU-Next-SUSFS-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ✅ | `Inline` |
+| [KernelSU-Next-SUSFS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ❌ | `De-inlined` |
+| [KernelSU-Next-SUSFS-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ✅ | `De-inlined` |
 | [KernelSU-Official](https://github.com/tiann/KernelSU) | ❌ | ❌ | `Kprobes` |
 | [KernelSU-Official-DS](https://github.com/tiann/KernelSU) | ❌ | ✅ | `Kprobes` |
-| [KernelSU-Official-SUSFS](https://github.com/tiann/KernelSU) | ✅ | ❌ | `Inline` |
-| [KernelSU-Official-SUSFS-DS](https://github.com/tiann/KernelSU) | ✅ | ✅ | `Inline` |
-| [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ❌ | `Manual` |
-| [ReSukiSU-DS](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ✅ | `Manual` |
-| [ReSukiSU-SUSFS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ❌ | `Inline` |
-| [ReSukiSU-SUSFS-DS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ✅ | `Inline` |
+| [KernelSU-Official-SUSFS](https://github.com/tiann/KernelSU) | ✅ | ❌ | `De-inlined` |
+| [KernelSU-Official-SUSFS-DS](https://github.com/tiann/KernelSU) | ✅ | ✅ | `De-inlined` |
+| [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ❌ | `Manual` / `Tracepoint` |
+| [ReSukiSU-DS](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ✅ | `Manual` / `Tracepoint` |
+| [ReSukiSU-SUSFS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ❌ | `De-inlined` |
+| [ReSukiSU-SUSFS-DS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ✅ | `De-inlined` |
 | [KernelSU-XX](https://github.com/backslashxx/KernelSU) | ❌ | ❌ | `Hookless` |
 | [KernelSU-XX-DS](https://github.com/backslashxx/KernelSU) | ❌ | ✅ | `Hookless` |
 | [KernelSU-XX-SUSFS](https://github.com/backslashxx/KernelSU) | ✅ | ❌ | `De-inlined` |
 | [KernelSU-XX-SUSFS-DS](https://github.com/backslashxx/KernelSU) | ✅ | ✅ | `De-inlined` |
 
-> \* **KernelSU-XX 和 ReSukiSU 的 Hook 类型：** 可通过 `hook_mode` 运行时配置。
+> \* **KernelSU-XX 和 ReSukiSU 的 Hook 类型：** 在构建时通过 `hook_mode` 选择，与 SUSFS 开关独立。
 > - `hookless` — KernelSU-XX 的默认值；所有内核版本均使用 `CONFIG_KSU_HACK_ARM64_BRANCH_LINK`
-> - `manual` — ReSukiSU 的默认值
+> - `manual` — XX 和 ReSukiSU 均可选；默认的 XX-only hookless 选项会将 ReSukiSU 映射为 `tracepoint`
 > - `tracepoint` — 仅限 ReSukiSU
 
 > [!TIP]
-> **矩阵构建编排：** 矩阵始终为每个变体产出恰好 **1 个构件** — 启用的功能（Droidspaces 和/或 SUSFS）会应用到该单一构件上。选择全部 5 个变体时，每个内核版本的 **每个启用子版本产生 5 次构建**。从 `kernel_version` 下拉菜单中选择 `all` 将并行编译 6.1、6.6 和 6.12 的启用子版本，在默认配置下共 **20 个并发 Job**。
+> **矩阵构建编排：** 普通构建按所选变体和子版本各产出一个内核包，6.12 使用所选 `kernel_sublevel`，默认仍为 `23`。独立的 `validate-stack` 模式执行 48 组代表性内核构建、10 组 Android 配套构建及配对 SUSFS 模块构建，不创建 Release。
 
 ---
 
@@ -82,9 +87,9 @@
 | :--- | :--- |
 | `Kprobes` | 运行时通过 kprobe 断点动态插桩内核函数。内核占用极小，兼容性广泛。**KowSU 和 KernelSU Official 的默认类型**（非 SUSFS）。 |
 | `Tracepoint` | 接入内核的静态系统调用 tracepoint 基础设施（`sys_enter`/`sys_exit`），无需修改内核源码。**KernelSU-Next 的默认类型**（非 SUSFS）。 |
-| `Inline` | 编译时通过直接嵌入内核子系统源码的 `#ifdef CONFIG_KSU_SUSFS` 代码块注入。使用 `static_key` 分支实现运行时切换。不依赖 kprobes 或 LSM 钩子。硬编码于 VFS（`exec`、`open`、`stat`、`readdir`、`statfs`）、SELinux（`avc`、`hooks`、`services`）、input、mounts 和 procfs。**用于 KowSU、KernelSU-Next、ReSukiSU 和 KernelSU Official 的 SUSFS 构建。** |
-| `De-inlined` | 通过内核源码打补丁而非内联 `#ifdef CONFIG_KSU_SUSFS` 代码块来应用 SUSFS 钩子。SUSFS 逻辑与核心内核子系统分离更清晰。**用于 KernelSU-XX-SUSFS。** |
-| `Manual` | 静态内核源码打补丁。编译时将自定义钩子注入核心内核子系统。**ReSukiSU 的默认类型**（非 SUSFS）。 |
+| `Inline` | 旧式集成将 KernelSU 调用点内联到 SUSFS 内核补丁中。本分支审查后的组合不再使用该方式。 |
+| `De-inlined` | 移除 SUSFS 补丁中的旧式 KernelSU 内联调用，保留 SUSFS 文件系统改动。KernelSU 使用自身 Hook 机制并提供配对的 SUSFS 回调。**五个变体的 SUSFS 集成都使用该方式。** |
+| `Manual` | 通过内核源码补丁加入显式 KernelSU Hook；XX 和 ReSukiSU 均可选，与 SUSFS 开关独立。 |
 | `Hookless` | 纯 KernelSU 内置机制。所有内核版本均启用 `CONFIG_KSU_HACK_ARM64_BRANCH_LINK`。零内核源码修改。完全依赖 KernelSU 的内部 Hook 基础设施。**KernelSU-XX 的默认类型**（非 SUSFS）。 |
 
 ---
@@ -95,7 +100,7 @@
 | :--- | :--- |
 | **内核版本** | 选择 `6.1`、`6.6`、`6.12` 或 `all` 来编译一个或全部内核版本。子版本、修订号、编译器和 Rust 设置从集中配置中自动解析。 |
 | **源码镜像** | 在 Google 官方 AOSP 镜像或自托管镜像之间选择，用于内核源码和工具链下载。 |
-| **SUSFS 模块** | 当启用 SUSFS 时，自动获取最新的 [susfs4ksu-module](https://github.com/sidex15/susfs4ksu-module) 并将其附加到发布中。单个 `susfs_commit` 输入控制所有变体的 SUSFS 版本。 |
+| **SUSFS 模块** | 从固定源码编译 ARM64 工具，核对三套 SUSFS 头文件的 ABI，并与固定版本模块配对打包。安装与更新操作均使用同一个经过哈希校验的内置工具，不再下载可变的最新二进制。 |
 | **KSU 工具箱** | 自动从 nightly.link 获取最新的 [ksu_toolkit](https://github.com/backslashxx/ksu_toolkit) 模块并将其附加到发布中。 |
 | **Droidspaces** | 通过 [Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS) 提供容器支持 — SYSVIPC、IPC_NS、PID_NS、DEVTMPFS、NTSync 和网络。通过 `use_droidspaces` 开关按变体启用。 |
 | **Re:Kernel(-X)** | 集成的 [Re:Kernel](https://github.com/Sakion-Team/Re-Kernel) 和 [Re:Kernel-X](https://github.com/myflavor/ReKernel-X) 模块直接编译进内核。提供 tombstone 冻结恢复、网络触发解冻和 binder 异步清理。通过 `use_rekernel` 开关控制。 |
@@ -109,7 +114,7 @@
 
 ## ✅ 已测试设备
 
-以下设备已确认可使用本工作流构建的内核：
+以下列表保留历史版本的设备反馈，不代表本次 SUSFS 迁移已经完成真机测试：
 
 | 品牌 | 型号 |
 | :--- | :--- |
@@ -121,7 +126,7 @@
 > [!NOTE]
 > **兼容性说明：**
 > - 以上设备均运行 Android 16+，搭载 GKI 内核（6.1/6.6/6.12）
-> - SUSFS 与 Droidspaces 功能已在所有设备系列上完成测试
+> - CI 编译和产物核验不能替代真机测试
 > - 原厂系统用户建议通过所选 KernelSU 变体提供的管理器或 Kernel Flasher 刷入内核
 
 > [!TIP]

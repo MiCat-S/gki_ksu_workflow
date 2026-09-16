@@ -33,6 +33,8 @@
 
 カーネルバージョン固有の設定は、すべて [`.github/config/kernel_versions.json`](.github/config/kernel_versions.json) に集約されています。ワークフロー実行時に `kernel_version` を指定するだけで、カーネルバージョン、サブレベル、コンパイラ、Rust の要否、AnyKernel3 のブランチ選択など、ビルドマトリクス全体が自動的に決定されます。
 
+このフォークは [ksu-stacks.json](.github/config/ksu-stacks.json) でレビュー済みの組み合わせを固定します。空の `susfs_commit` は KMI ごとの固定コミットを選択し、未検証の組み合わせは拒否します。更新手順と検証範囲は [Reviewed Stacks](docs/REVIEWED_STACKS.md) を参照してください。
+
 ---
 
 ## 📦 ビルドバリアント
@@ -41,32 +43,32 @@
 | :--- | :---: | :---: | :--- |
 | [KowSU](https://github.com/KOWX712/KernelSU) | ❌ | ❌ | `Kprobes` |
 | [KowSU-DS](https://github.com/KOWX712/KernelSU) | ❌ | ✅ | `Kprobes` |
-| [KowSU-SUSFS](https://github.com/KOWX712/KernelSU) | ✅ | ❌ | `Inline` |
-| [KowSU-SUSFS-DS](https://github.com/KOWX712/KernelSU) | ✅ | ✅ | `Inline` |
+| [KowSU-SUSFS](https://github.com/KOWX712/KernelSU) | ✅ | ❌ | `De-inlined` |
+| [KowSU-SUSFS-DS](https://github.com/KOWX712/KernelSU) | ✅ | ✅ | `De-inlined` |
 | [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ❌ | `Tracepoint` |
 | [KernelSU-Next-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ❌ | ✅ | `Tracepoint` |
-| [KernelSU-Next-SUSFS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ❌ | `Inline` |
-| [KernelSU-Next-SUSFS-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ✅ | `Inline` |
+| [KernelSU-Next-SUSFS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ❌ | `De-inlined` |
+| [KernelSU-Next-SUSFS-DS](https://github.com/KernelSU-Next/KernelSU-Next) | ✅ | ✅ | `De-inlined` |
 | [KernelSU-Official](https://github.com/tiann/KernelSU) | ❌ | ❌ | `Kprobes` |
 | [KernelSU-Official-DS](https://github.com/tiann/KernelSU) | ❌ | ✅ | `Kprobes` |
-| [KernelSU-Official-SUSFS](https://github.com/tiann/KernelSU) | ✅ | ❌ | `Inline` |
-| [KernelSU-Official-SUSFS-DS](https://github.com/tiann/KernelSU) | ✅ | ✅ | `Inline` |
-| [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ❌ | `Manual` |
-| [ReSukiSU-DS](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ✅ | `Manual` |
-| [ReSukiSU-SUSFS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ❌ | `Inline` |
-| [ReSukiSU-SUSFS-DS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ✅ | `Inline` |
+| [KernelSU-Official-SUSFS](https://github.com/tiann/KernelSU) | ✅ | ❌ | `De-inlined` |
+| [KernelSU-Official-SUSFS-DS](https://github.com/tiann/KernelSU) | ✅ | ✅ | `De-inlined` |
+| [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ❌ | `Manual` / `Tracepoint` |
+| [ReSukiSU-DS](https://github.com/ReSukiSU/ReSukiSU) | ❌ | ✅ | `Manual` / `Tracepoint` |
+| [ReSukiSU-SUSFS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ❌ | `De-inlined` |
+| [ReSukiSU-SUSFS-DS](https://github.com/ReSukiSU/ReSukiSU) | ✅ | ✅ | `De-inlined` |
 | [KernelSU-XX](https://github.com/backslashxx/KernelSU) | ❌ | ❌ | `Hookless` |
 | [KernelSU-XX-DS](https://github.com/backslashxx/KernelSU) | ❌ | ✅ | `Hookless` |
 | [KernelSU-XX-SUSFS](https://github.com/backslashxx/KernelSU) | ✅ | ❌ | `De-inlined` |
 | [KernelSU-XX-SUSFS-DS](https://github.com/backslashxx/KernelSU) | ✅ | ✅ | `De-inlined` |
 
-> \* **KernelSU-XX および ReSukiSU のフック方式:** 実行時に `hook_mode` で切り替え可能です。
+> \* **KernelSU-XX および ReSukiSU のフック方式:** ビルド時に `hook_mode` で選択します。SUSFS の有効・無効とは独立しています。
 > - `hookless` — KernelSU-XX のデフォルト；すべてのカーネルバージョンで `CONFIG_KSU_HACK_ARM64_BRANCH_LINK` を使用
-> - `manual` — ReSukiSU のデフォルト
+> - `manual` — XX と ReSukiSU で選択可能。既定の XX-only hookless 選択時、ReSukiSU は `tracepoint` を使用
 > - `tracepoint` — ReSukiSU のみ対応
 
 > [!TIP]
-> **マトリクスビルドの仕組み:** マトリクスは常にバリアントごとに **1 つの成果物** のみを生成します。有効化した機能（Droidspaces / SUSFS）は、その単一の成果物に適用されます。5 つのバリアントすべてを選択した場合、カーネルバージョンの **有効な各サブレベルごとに 5 つのビルド** が実行されます。`kernel_version` で `all` を選択すると、6.1 / 6.6 / 6.12 の有効なサブレベルが並列コンパイルされ、デフォルト設定では合計 **20 のジョブ** が同時に実行されます。
+> 通常のビルドは選択したバリアントとサブレベルごとにカーネルを生成します。6.12 の既定サブレベルは `23` です。`validate-stack` は代表的なカーネル 48 件、Android 10 件、対応 SUSFS モジュールを検証し、Release は作成しません。
 
 ---
 
@@ -82,9 +84,9 @@
 | :--- | :--- |
 | `Kprobes` | 実行時に kprobe ブレークポイントを用いてカーネル関数を動的にフックします。カーネルへの影響が最小限で、幅広い互換性を持ちます。**KowSU および KernelSU Official（非 SUSFS）のデフォルト。** |
 | `Tracepoint` | カーネルの静的な syscall tracepoint 基盤（`sys_enter`/`sys_exit`）にフックするため、カーネルソースの改変を行いません。**KernelSU-Next（非 SUSFS）のデフォルト。** |
-| `Inline` | `#ifdef CONFIG_KSU_SUSFS` ブロックをカーネルサブシステムのソースに直接埋め込む、コンパイル時注入方式です。`static_key` 分岐により実行時の切り替えが可能です。kprobe や LSM フックには依存しません。VFS（`exec`、`open`、`stat`、`readdir`、`statfs`）、SELinux（`avc`、`hooks`、`services`）、input、mounts、procfs に組み込まれます。**KowSU、KernelSU-Next、ReSukiSU、KernelSU Official の SUSFS ビルドで使用。** |
-| `De-inlined` | `#ifdef CONFIG_KSU_SUSFS` によるインラインブロックを使用せず、カーネルソースへのパッチ適用により SUSFS フックを組み込みます。SUSFS ロジックがコアカーネルサブシステムからより明確に分離されます。**KernelSU-XX-SUSFS で使用。** |
-| `Manual` | カーネルソースへの静的なパッチ適用方式です。コンパイル時に独自のフックをコアカーネルサブシステムへ注入します。**ReSukiSU（非 SUSFS）のデフォルト。** |
+| `Inline` | SUSFS パッチに KernelSU 呼び出しを埋め込む旧方式。このフォークのレビュー済み構成では使用しません。 |
+| `De-inlined` | 旧 KernelSU 呼び出しを除去し、SUSFS のファイルシステム変更を保持します。KernelSU は自身のフックと対応コールバックを使用します。**全 5 バリアントの SUSFS 統合方式です。** |
+| `Manual` | カーネルソースへの明示的な KernelSU フック。XX と ReSukiSU で SUSFS の有効・無効とは独立して選択できます。 |
 | `Hookless` | KernelSU 組み込みの機構のみを使用します。すべてのカーネルバージョンで `CONFIG_KSU_HACK_ARM64_BRANCH_LINK` を有効化し、カーネルソースの改変は一切行いません。KernelSU 内部のフック基盤に完全に依存します。**KernelSU-XX（非 SUSFS）のデフォルト。** |
 
 ---
@@ -95,7 +97,7 @@
 | :--- | :--- |
 | **カーネルバージョン** | `6.1`、`6.6`、`6.12`、または `all` から、単一または全バージョンを選択できます。サブレベル、リビジョン、コンパイラ、Rust の各設定は、一元化された config から自動解決されます。 |
 | **ソースミラー** | カーネルソースおよびツールチェーンの取得先として、Google 公式の AOSP ミラー、またはセルフホストミラーを選択可能です。 |
-| **SUSFS モジュール** | SUSFS 有効時に、最新の [susfs4ksu-module](https://github.com/sidex15/susfs4ksu-module) を自動取得してリリースに同梱します。全バリアントの SUSFS バージョンは単一の `susfs_commit` 入力で一元管理されます。 |
+| **SUSFS モジュール** | 固定ソースから ARM64 ツールをビルドし、3 種類の SUSFS ABI を確認して固定モジュールと組み合わせます。インストールと更新はハッシュ検証済みの同梱ツールを使用します。 |
 | **KSU ツールキット** | 最新の [ksu_toolkit](https://github.com/backslashxx/ksu_toolkit) モジュールを nightly.link から自動取得し、リリースに同梱します。 |
 | **Droidspaces** | [Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS) を利用したコンテナ対応。SYSVIPC、IPC_NS、PID_NS、DEVTMPFS、NTSync、ネットワーク機能を提供します。`use_droidspaces` トグルでバリアントごとに有効化できます。 |
 | **Re:Kernel(-X)** | [Re:Kernel](https://github.com/Sakion-Team/Re-Kernel) および [Re:Kernel-X](https://github.com/myflavor/ReKernel-X) モジュールをカーネルに直接組み込みます。tombstone によるフリーズ復旧、ネットワークトリガーによる解除、binder 非同期クリーンアップを提供します。`use_rekernel` スイッチで制御します。 |
@@ -109,7 +111,7 @@
 
 ## ✅ 動作確認済み端末
 
-本ワークフローでビルドしたカーネルにて、下記端末での動作を確認済みです。
+以下は過去のバージョンに対するデバイス報告です。今回の SUSFS 移行の実機検証を示すものではありません。
 
 | ブランド | モデル |
 | :--- | :--- |
@@ -121,7 +123,7 @@
 > [!NOTE]
 > **互換性について**
 > - 記載の端末はいずれも Android 16 以降・GKI カーネル（6.1/6.6/6.12）環境で動作しています
-> - SUSFS / Droidspaces は全シリーズで検証済みです
+> - デバイス一覧は過去の報告です。今回の SUSFS 移行は実機検証済みではなく、CI は実機テストの代わりにはなりません
 > - 純正 ROM をご利用の場合は、選択した KernelSU バリアントのマネージャー、または Kernel Flasher からの書き込みを推奨します
 
 > [!TIP]
