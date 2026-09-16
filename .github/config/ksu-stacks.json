@@ -37,12 +37,12 @@
       "branch": "official",
       "prefix": "kernelsu_official",
       "extra": {
-        "commit": "185c83f1a5797afbdf586297e48aa94ee209a16c",
-        "tree": "c317899418fac56ea247d5f45c58ebe94c0ed531"
+        "commit": "b9d751970c637881eb2c1baee35f635090d3a5a3",
+        "tree": "c877abfb92d252d88260d175141dfa54edac2625"
       },
       "integration": {
-        "commit": "cfcbeb48b9dc114f0f0736e37d4cae69abd39312",
-        "tree": "569e43165bc2e601e83f008bc59dee04e42274d0"
+        "commit": "f3284d84dce3be54da695f332783b589a4bfb24c",
+        "tree": "14cada11a01dde92a6737ba28344aa874a1b6091"
       }
     },
     "ReSukiSU": {
