@@ -1,0 +1,47 @@
+name: Build Paired SUSFS Module
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve pinned userspace
+        id: pin
+        run: |
+          jq -r '.userspace | to_entries[] | "\(.key)=\(.value)"' .github/config/ksu-stacks.json >> "$GITHUB_OUTPUT"
+      - name: Fetch reviewed tool and module sources
+        run: |
+          bash .github/scripts/fetch-pinned.sh tool-source "${{ steps.pin.outputs.tool_commit }}" "https://github.com/${{ steps.pin.outputs.tool_repo }}.git"
+          bash .github/scripts/fetch-pinned.sh module-source "${{ steps.pin.outputs.module_commit }}" "https://github.com/${{ steps.pin.outputs.module_repo }}.git"
+          git -C tool-source apply --check "$GITHUB_WORKSPACE/.github/patches/susfs-userspace-kstat.patch"
+          git -C tool-source apply "$GITHUB_WORKSPACE/.github/patches/susfs-userspace-kstat.patch"
+      - uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: ${{ steps.pin.outputs.ndk }}
+      - name: Build ARM64 tool from source
+        env:
+          NDK: ${{ steps.ndk.outputs.ndk-path }}
+        run: |
+          cc="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang"
+          for sha in $(jq -r '.profiles[].commit' .github/config/ksu-stacks.json); do
+            bash .github/scripts/fetch-pinned.sh "susfs-$sha" "$sha" \
+              https://gitlab.com/simonpunk/susfs4ksu.git https://github.com/midori01/susfs4ksu.git
+            python3 .github/scripts/check-susfs-userspace.py "susfs-$sha" tool-source "$cc"
+          done
+          make -C tool-source CC="$cc" OUT=ksu_susfs-built
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h tool-source/ksu_susfs-built
+          python3 .github/scripts/package-susfs.py module-source tool-source/ksu_susfs-built paired-susfs
+      - uses: actions/upload-artifact@v7
+        with:
+          name: paired-susfs-module
+          path: |
+            paired-susfs/susfs-reviewed-stack.zip
+            paired-susfs/stack-provenance.json
+            tool-source/ksu_susfs-built
+          if-no-files-found: error

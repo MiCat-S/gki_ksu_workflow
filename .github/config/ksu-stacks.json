@@ -1,0 +1,198 @@
+{
+  "schema": 1,
+  "source_repo": "MiCat-S/KernelSU",
+  "reference_workflow": "de695f22c1d1f1b9ad783f35dff69980b8985363",
+  "variants": {
+    "KowSU": {
+      "base": "97e32a83e0158d916ad61ed799cacd33af0a4065",
+      "source_spec": "KOWX712/KernelSU:master",
+      "branch": "kow",
+      "prefix": "kowsu",
+      "extra": {
+        "commit": "fe7581bf438bdf3a7ac337c9e8fc1f4c5274b4ba",
+        "tree": "31bb346848ae2519b915043f1066e5f9646e7a1f"
+      },
+      "integration": {
+        "commit": "54d2a5cd903556cc69126a03160e8be2bba0762b",
+        "tree": "bbf792ea6e4462d3ec2501d101a3e90a97dcff3a"
+      }
+    },
+    "KernelSU-Next": {
+      "base": "f9a69951d3b6db7f0904688da08658da646b2368",
+      "source_spec": "KernelSU-Next/KernelSU-Next:dev",
+      "branch": "next",
+      "prefix": "kernelsu_next",
+      "extra": {
+        "commit": "2ab5391ef07f1ef9b7d1415d84c0d4638cb06950",
+        "tree": "48ae06be4ab36cf688a7cb5a44fadabb10953ab8"
+      },
+      "integration": {
+        "commit": "7a6154c5befb556b9ddd6e6065f6eacb288f949d",
+        "tree": "f2e6859970de6a235bc659fbef01605976bbb913"
+      }
+    },
+    "KernelSU-Official": {
+      "base": "3a7ac9dc0dc8c0b573fd4eb4836fd0860ef4242e",
+      "source_spec": "tiann/KernelSU:main",
+      "branch": "official",
+      "prefix": "kernelsu_official",
+      "extra": {
+        "commit": "18033398164c31efd7ac683326a279556899165f",
+        "tree": "3d22a832397c06d5a52050b3a12a8f819d1a922e"
+      },
+      "integration": {
+        "commit": "99f1c78d91f09c458d64179cb4f575c9caed10b8",
+        "tree": "ad1d9d6d44b351e92751b1ff085241abf5317a62"
+      }
+    },
+    "ReSukiSU": {
+      "base": "6d674e50a022a85076dcfe4498af9a8bfead2cf9",
+      "source_spec": "ReSukiSU/ReSukiSU:main",
+      "branch": "resuki",
+      "prefix": "resukisu",
+      "extra": {
+        "commit": "ede3e55dffbb3856a1453c09af9ff3a801375116",
+        "tree": "6eee18e4760fa766ce34fa9246165e050ed74254"
+      },
+      "integration": {
+        "commit": "2c2397389790696a37ff1e9d130298c987477967",
+        "tree": "01ba755e4e7b23fd3f54a91dc772cebe383e14ab"
+      }
+    },
+    "KernelSU-XX": {
+      "base": "31f6e91e3c17079cf2217112cea4619694008060",
+      "source_spec": "backslashxx/KernelSU:master",
+      "branch": "xx",
+      "prefix": "kernelsu_xx",
+      "extra": {
+        "commit": "828cfdede91a4a80ce70d830819a9c15c821a93a",
+        "tree": "fecc999c016cb0cd5ada09f15b118029ba23e14c"
+      },
+      "integration": {
+        "commit": "ff4d2f8549de1ac9f8e52e39b0d092ff372dd2d5",
+        "tree": "5caa6a43cd0386c571e3a70f167958019744ae29"
+      }
+    }
+  },
+  "auxiliary": {
+    "rekernel": "5adec4896a549af60fab2ab59441a777551763b9",
+    "rekernel_x": "7096c831a6530979c3caf62562f398a2d07bc062",
+    "rekernel_x_version": "v1.4",
+    "anykernel": "fa094a88a25cd46ab9b53eaa8c1e86a7d62abcd4"
+  },
+  "userspace": {
+    "tool_repo": "sidex15/susfs4ksu-binaries",
+    "tool_commit": "041f69d7fe23a7bd928f9bd90eb3535774d00456",
+    "module_repo": "sidex15/susfs4ksu-module",
+    "module_commit": "c6a1c065efff9eaead049acf529a10bc93d34e75",
+    "ndk": "r29"
+  },
+  "profiles": {
+    "android14-6.1": {
+      "commit": "05f201978bdbd5d08f842e0a2a6e0f2ff0912787",
+      "try_umount_patch": {
+        "path": ".github/patches/55_try_umount_for_susfs.patch",
+        "sha256": "45cb8ecfc00e11f041245d6d82ee552d29ceb7d0c1fce0ca99f1ff0a4808b5cb"
+      },
+      "patch": {
+        "6.1": {
+          "path": ".github/patches/android14-6.1/51_susfs_deinlined_in_gki-android14-6.1.patch",
+          "sha256": "4583b92b03657cce4cf9b96ba124b59f318deaa8c3d80d9667aa40af2670233f"
+        }
+      },
+      "kernels": {
+        "172": {
+          "commit": "a53ef9cd393f13067c8fd0fec547c662158e8cba",
+          "archive_sha256": "ad3769b9af38ba48e07c80508540eb19f667cd574ec964d1660e923d88858221",
+          "patch_key": "6.1"
+        },
+        "177": {
+          "commit": "38c2ee7f1213aaa84824aa93e0fbfb80bdb3efb6",
+          "archive_sha256": "10da5976c222043ba468425156246cfa48454bd274c8bcf95230850da36ed553",
+          "patch_key": "6.1"
+        }
+      }
+    },
+    "android15-6.6": {
+      "commit": "01677642e6ade3b9e56e0a8660192a664dad79e9",
+      "try_umount_patch": {
+        "path": ".github/patches/55_try_umount_for_susfs.patch",
+        "sha256": "45cb8ecfc00e11f041245d6d82ee552d29ceb7d0c1fce0ca99f1ff0a4808b5cb"
+      },
+      "patch": {
+        "6.6": {
+          "path": ".github/patches/android15-6.6/51_susfs_deinlined_in_gki-android15-6.6.patch",
+          "sha256": "74f6bea371980014435853fe2588e7927553015db8cc22dc1d989dd92015f6db"
+        }
+      },
+      "kernels": {
+        "139": {
+          "commit": "58344949eedf2ab857ccc4c6735fa7df4a208dfb",
+          "archive_sha256": "6f61d1c80e97b496368460317d8e59817b72305edb9e26916fcc7290b3583f5d",
+          "patch_key": "6.6"
+        },
+        "143": {
+          "commit": "93bbc15e5f81decdc48d1318aa0ba5ffb4211059",
+          "archive_sha256": "ed499282e57266f73dcace726997edf61b1769c9433ab816e1e1c39931173477",
+          "patch_key": "6.6"
+        }
+      }
+    },
+    "android16-6.12": {
+      "commit": "634757955537bf77074eeeb2943728bc77dff0e9",
+      "try_umount_patch": {
+        "path": ".github/patches/55_try_umount_for_susfs.patch",
+        "sha256": "45cb8ecfc00e11f041245d6d82ee552d29ceb7d0c1fce0ca99f1ff0a4808b5cb"
+      },
+      "patch": {
+        "23": {
+          "path": ".github/patches/android16-6.12/51_susfs_deinlined_in_gki-android16-6.12.23.patch",
+          "sha256": "1148eac3f407d56101e5d15a5d1ce891c4f43fbd2906f03da10e39ac2be87bef"
+        },
+        "38": {
+          "path": ".github/patches/android16-6.12/51_susfs_deinlined_in_gki-android16-6.12.38.patch",
+          "sha256": "c8c33145832ae0af8b25cb8d54b392f24eef75c466799021ddcecc9885eff9f4"
+        },
+        "69": {
+          "path": ".github/patches/android16-6.12/51_susfs_deinlined_in_gki-android16-6.12.69.patch",
+          "sha256": "9545c2e03f62332d850453a0325caf07d3bfd473be7e0c6870243d393480a8c2"
+        },
+        "81": {
+          "path": ".github/patches/android16-6.12/51_susfs_deinlined_in_gki-android16-6.12.81.patch",
+          "sha256": "1b26666cc59c94d10d62980ef21eedc29fa722a610db5ff1d1b3f5ab875be4e9"
+        },
+        "93": {
+          "path": ".github/patches/android16-6.12/51_susfs_deinlined_in_gki-android16-6.12.93.patch",
+          "sha256": "702ef8a377295e2755052377ceb09b6b7598da7a7760570b1f3f8f02bd9d44d8"
+        }
+      },
+      "kernels": {
+        "23": {
+          "commit": "37e196381e1c7823be8c0774d15cb34855b2ee04",
+          "archive_sha256": "dd11298f5641808adce09569791663e2444867052cecbce2570392067ca9240c",
+          "patch_key": "23"
+        },
+        "38": {
+          "commit": "1b0462bd0618c9fa384498dce3d8c4476182bedf",
+          "archive_sha256": "b7fe16bba1d8cd801e0d2db5e63121d98a2614298e244647d46807028ad83159",
+          "patch_key": "38"
+        },
+        "69": {
+          "commit": "da20c4f35dcc3729bc90d6f516f3e9ce86964cbe",
+          "archive_sha256": "81f3402d980cbb8d9dd502e041fb0bf8e4c5897cad3b387e982ff9388c6d36aa",
+          "patch_key": "69"
+        },
+        "81": {
+          "commit": "22e6fa8430bffa2fc3985cfdacfe122220f650fa",
+          "archive_sha256": "bfbec99f4607f09d7d5a5f2a5fe0c111758f409a918d4e05388188c2a0eef81b",
+          "patch_key": "81"
+        },
+        "93": {
+          "commit": "57041e4a7e52342473871000827584f966d8cbd3",
+          "archive_sha256": "49dc05c682f39656e83104a3bb620ad70fd57eaf586223a8cd2260c58cf3b3b5",
+          "patch_key": "93"
+        }
+      }
+    }
+  }
+}

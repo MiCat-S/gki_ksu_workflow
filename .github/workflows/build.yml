@@ -32,7 +32,7 @@ on:
           - '38'
           - '69'
           - '81'
-          - '92'
+          - '93'
       ksu_variant:
         description: 'KernelSU Variant'
         required: true
@@ -128,7 +128,7 @@ on:
           - GitLab
           - GitHub
       susfs_commit:
-        description: 'SUSFS Commit Hash (Leave blank for latest)'
+        description: 'SUSFS Commit Hash (blank uses the reviewed locked stack)'
         required: false
         default: ''
         type: string
@@ -156,6 +156,7 @@ on:
           - release
           - pre-release
           - no-release
+          - validate-stack
       cleanup_tags:
         description: "Cleanup Old Releases"
         type: boolean
@@ -167,13 +168,15 @@ permissions:
   packages: write
 
 jobs:
-  fetch:
-    uses: ./.github/workflows/update.yml
+  validation:
+    if: inputs.release_type == 'validate-stack'
+    uses: ./.github/workflows/validate-stack.yml
     with:
-      kernel_version: ${{ inputs.kernel_version }}
+      group: ${{ inputs.ksu_variant }}
+      susfs: both
 
   setup:
-    needs: fetch
+    if: inputs.release_type != 'validate-stack'
     runs-on: ubuntu-latest
     outputs:
       release_tag: ${{ steps.config.outputs.release_tag }}
@@ -190,13 +193,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.sha }}
           fetch-depth: 1
-
-      - name: Pull latest config from fetch job
-        run: |
-          git fetch origin ${{ github.ref_name }} --depth=1 2>/dev/null || true
-          git checkout FETCH_HEAD -- .github/config/kernel_versions.json 2>/dev/null || true
 
       - id: config
         name: Prepare build matrix and metadata
@@ -361,17 +359,23 @@ jobs:
       kernelsu_official_branch: ${{ inputs.kernelsu_official_branch }}
       resukisu_branch: ${{ inputs.resukisu_branch }}
       kernelsu_xx_branch: ${{ inputs.kernelsu_xx_branch }}
-      hook_mode: ${{ needs.setup.outputs.hook_mode_val }}
+      hook_mode: ${{ matrix.variant == 'KernelSU-XX' && (needs.setup.outputs.hook_mode_val == 'hookless' && 'hookless' || 'manual') || matrix.variant == 'ReSukiSU' && (needs.setup.outputs.hook_mode_val == 'manual' && 'manual' || 'tracepoint') || 'manual' }}
       ksu_debug: ${{ inputs.ksu_debug }}
       upload_vmlinux: ${{ inputs.upload_vmlinux }}
 
+  susfs-tools:
+    if: inputs.enable_susfs && inputs.release_type != 'validate-stack'
+    uses: ./.github/workflows/build-susfs-tools.yml
+
   release:
-    needs: [setup, build]
+    needs: [setup, build, susfs-tools]
     if: |
       always() &&
       inputs.release_type != 'no-release' &&
+      inputs.release_type != 'validate-stack' &&
       needs.setup.result == 'success' &&
-      needs.build.result == 'success'
+      needs.build.result == 'success' &&
+      (!inputs.enable_susfs || needs.susfs-tools.result == 'success')
     strategy:
       matrix:
         kv: ${{ fromJson(needs.setup.outputs.kernel_versions) }}
@@ -428,12 +432,17 @@ jobs:
           fi
           echo "TOOLKIT_FILE=$toolkit" >> $GITHUB_ENV
 
-      - name: Download SUSFS Module
+      - name: Download Paired SUSFS Module
         if: inputs.enable_susfs == true
-        env:
-          GH_TOKEN: ${{ github.token }}
+        uses: actions/download-artifact@v8
+        with:
+          name: paired-susfs-module
+          path: paired-susfs
+
+      - name: Collect Paired SUSFS Module
+        if: inputs.enable_susfs == true
         run: |
-          gh release download --repo sidex15/susfs4ksu-module --pattern "*.zip" --dir release_zips 2>/dev/null || true
+          cp paired-susfs/paired-susfs/susfs-reviewed-stack.zip release_zips/
 
       - name: Read Commit Info
         id: ksu_info
@@ -534,5 +543,5 @@ jobs:
 
   cleanup:
     needs: release
-    if: inputs.cleanup_tags && (success() || failure())
+    if: inputs.release_type != 'validate-stack' && inputs.cleanup_tags && (success() || failure())
     uses: ./.github/workflows/cleanup-tags.yml

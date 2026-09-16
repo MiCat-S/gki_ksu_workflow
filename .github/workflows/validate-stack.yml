@@ -1,0 +1,116 @@
+name: Validate Reviewed Stack
+run-name: Validate stack / ${{ inputs.group }}
+
+on:
+  workflow_call:
+    inputs:
+      group:
+        type: string
+        required: false
+        default: all
+      susfs:
+        type: string
+        required: false
+        default: both
+  workflow_dispatch:
+    inputs:
+      group:
+        description: 'Validation group (no release)'
+        type: choice
+        required: true
+        default: all
+        options: [all, KowSU, KernelSU-Next, KernelSU-XX, KernelSU-Official, ReSukiSU, additional-bases]
+      susfs:
+        description: 'SUSFS matrix'
+        type: choice
+        required: true
+        default: both
+        options: [both, 'on', 'off']
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      kernels: ${{ steps.matrix.outputs.kernels }}
+      companions: ${{ steps.matrix.outputs.companions }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate manifest and construct coverage
+        id: matrix
+        env:
+          GROUP: ${{ inputs.group }}
+          SUSFS: ${{ inputs.susfs }}
+        run: |
+          python3 .github/scripts/test-stacks.py -v
+          python3 -m venv config-check
+          config-check/bin/pip install PyYAML==6.0.3
+          config-check/bin/python .github/scripts/test-kernel-config.py
+          python3 - <<'PY'
+          import json, os
+          hooks = {"KowSU": ["manual"], "KernelSU-Next": ["manual"],
+                   "KernelSU-Official": ["manual"], "KernelSU-XX": ["manual", "hookless"],
+                   "ReSukiSU": ["manual", "tracepoint"]}
+          group = os.environ["GROUP"]
+          selected = list(hooks) if group in ("all", "additional-bases") else [group]
+          states = [True, False] if os.environ["SUSFS"] == "both" else [os.environ["SUSFS"] == "on"]
+          include = []
+          if group != "additional-bases":
+              for variant in selected:
+                  for hook in hooks[variant]:
+                      for kernel, sub in [("6.1", "177"), ("6.6", "143"), ("6.12", "23")]:
+                          for susfs in states:
+                              include.append(dict(variant=variant, hook=hook, kernel=kernel, sub=sub, susfs=susfs))
+          if group in ("all", "additional-bases"):
+              for kernel, sub in [("6.1", "172"), ("6.6", "139"),
+                                  ("6.12", "38"), ("6.12", "69"), ("6.12", "81"), ("6.12", "93")]:
+                  include.append(dict(variant="KowSU", hook="manual", kernel=kernel, sub=sub, susfs=True))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("kernels=" + json.dumps({"include": include}) + "\n")
+              output.write("companions=" + json.dumps(selected) + "\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write(f"Kernel jobs: {len(include)}. Full five-variant on/off coverage on three KMI baselines; additional bases use KowSU/SUSFS-on. This is not every Cartesian combination.\n")
+          PY
+
+  kernels:
+    needs: matrix
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix: ${{ fromJSON(needs.matrix.outputs.kernels) }}
+    name: "${{ matrix.kernel }}.${{ matrix.sub }} ${{ matrix.variant }} ${{ matrix.hook }} susfs=${{ matrix.susfs }}"
+    uses: ./.github/workflows/build-kernel.yml
+    with:
+      kernel_version: ${{ matrix.kernel }}
+      sub_level: ${{ matrix.sub }}
+      variant: ${{ matrix.variant }}
+      artifact_suffix: -${{ matrix.hook }}
+      hook_mode: ${{ matrix.hook }}
+      use_susfs: ${{ matrix.susfs }}
+      susfs_repo: GitHub
+      use_droidspaces: false
+      use_rekernel: true
+      use_adios: true
+      use_lz4_zstd: ${{ matrix.kernel == '6.12' && matrix.sub != '81' }}
+      source_mirror: release
+      use_ccache: false
+      kernel_localversion: -reviewed-stack-validation
+      build_epoch: '1789516800'
+      build_timestamp: 'Wed Sep 16 00:00:00 UTC 2026'
+      build_user: kleaf
+      build_host: build-host
+
+  susfs-tools:
+    uses: ./.github/workflows/build-susfs-tools.yml
+
+  companions:
+    needs: matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: ${{ fromJSON(needs.matrix.outputs.companions) }}
+    uses: ./.github/workflows/validate-companion.yml
+    with:
+      variant: ${{ matrix.variant }}

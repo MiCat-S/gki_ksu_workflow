@@ -3,9 +3,9 @@ Date: Sat, 29 Aug 2026 07:13:51 +0900
 Subject: [PATCH] Add try_umount for SUSFS
 
 ---
- fs/susfs.c            | 62 ++++++++++++++++++++++++++++
+ fs/susfs.c            | 70 ++++++++++++++++++++++++++++
  include/linux/susfs.h | 20 +++++++++
- 2 files changed, 82 insertions(+)
+ 2 files changed, 90 insertions(+)
 
 diff --git a/fs/susfs.c b/fs/susfs.c
 index 737a217..13e4654 100644
@@ -19,13 +19,13 @@ index 737a217..13e4654 100644
  
  extern bool susfs_is_current_ksu_domain(void);
  extern void setup_selinux(const char *domain, struct cred *cred);
-@@ -610,6 +611,62 @@ out_spoof_kstat:
+@@ -610,6 +611,70 @@ out_spoof_kstat:
  }
  #endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
  
 +/* try_umount */
 +#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
-+static DEFINE_SPINLOCK(susfs_spin_lock_try_umount);
++static DEFINE_MUTEX(susfs_mutex_try_umount);
 +extern void try_umount(const char *mnt, int flags);
 +static LIST_HEAD(LH_TRY_UMOUNT_PATH);
 +void susfs_add_try_umount(void __user **user_info) {
@@ -34,6 +34,12 @@ index 737a217..13e4654 100644
 +
 +	if (copy_from_user(&info, (struct st_susfs_try_umount __user*)*user_info, sizeof(info))) {
 +		info.err = -EFAULT;
++		goto out_copy_to_user;
++	}
++
++	if (!memchr(info.target_pathname, '\0', sizeof(info.target_pathname)) ||
++	    info.target_pathname[0] != '/') {
++		info.err = -EINVAL;
 +		goto out_copy_to_user;
 +	}
 +
@@ -56,9 +62,9 @@ index 737a217..13e4654 100644
 +	memcpy(&new_list->info, &info, sizeof(info));
 +
 +	INIT_LIST_HEAD(&new_list->list);
-+	spin_lock(&susfs_spin_lock_try_umount);
++	mutex_lock(&susfs_mutex_try_umount);
 +	list_add_tail(&new_list->list, &LH_TRY_UMOUNT_PATH);
-+	spin_unlock(&susfs_spin_lock_try_umount);
++	mutex_unlock(&susfs_mutex_try_umount);
 +	SUSFS_LOGI("target_pathname: '%s', umount options: %d, is successfully added to LH_TRY_UMOUNT_PATH\n", new_list->info.target_pathname, new_list->info.mnt_mode);
 +	info.err = 0;
 +out_copy_to_user:
@@ -72,10 +78,12 @@ index 737a217..13e4654 100644
 +	struct st_susfs_try_umount_list *cursor = NULL;
 +
 +	// We should umount in reversed order
++	mutex_lock(&susfs_mutex_try_umount);
 +	list_for_each_entry_reverse(cursor, &LH_TRY_UMOUNT_PATH, list) {
 +		SUSFS_LOGI("umounting '%s' for uid: %u\n", cursor->info.target_pathname, uid);
 +		try_umount(cursor->info.target_pathname, cursor->info.mnt_mode);
 +	}
++	mutex_unlock(&susfs_mutex_try_umount);
 +}
 +#endif // #ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
 +
@@ -134,4 +142,3 @@ index 6ede629..a0c7dfa 100644
  void susfs_set_uname(void __user **user_info);
 -- 
 2.55.0
-

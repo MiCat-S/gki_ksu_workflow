@@ -1,0 +1,111 @@
+name: Validate Android Companion
+on:
+  workflow_call:
+    inputs:
+      variant:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        snapshot: [extra, integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: validation-tools
+      - name: Resolve source snapshot
+        id: source
+        env:
+          VARIANT: ${{ inputs.variant }}
+          SNAPSHOT: ${{ matrix.snapshot }}
+        run: |
+          manifest=validation-tools/.github/config/ksu-stacks.json
+          echo "commit=$(jq -er --arg v "$VARIANT" --arg s "$SNAPSHOT" '.variants[$v][$s].commit' "$manifest")" >> "$GITHUB_OUTPUT"
+          echo "tree=$(jq -er --arg v "$VARIANT" --arg s "$SNAPSHOT" '.variants[$v][$s].tree' "$manifest")" >> "$GITHUB_OUTPUT"
+      - name: Fetch immutable source
+        run: |
+          FETCH_FULL_HISTORY=true bash validation-tools/.github/scripts/fetch-pinned.sh \
+            source "${{ steps.source.outputs.commit }}" https://github.com/MiCat-S/KernelSU.git
+          test "$(git -C source rev-parse 'HEAD^{tree}')" = "${{ steps.source.outputs.tree }}"
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Setup Rust
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --component clippy --component rustfmt --target aarch64-linux-android
+          rustup default 1.98.1
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev
+      - uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r29
+      - name: Check and build locked ksud
+        working-directory: source
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+          CARGO_TARGET_DIR: ${{ github.workspace }}/cargo-target
+        run: |
+          toolchain="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64"
+          export CC_aarch64_linux_android="$toolchain/bin/aarch64-linux-android26-clang"
+          export CXX_aarch64_linux_android="$toolchain/bin/aarch64-linux-android26-clang++"
+          export AR_aarch64_linux_android="$toolchain/bin/llvm-ar"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CC_aarch64_linux_android"
+          export BINDGEN_EXTRA_CLANG_ARGS_aarch64_linux_android="--sysroot=$toolchain/sysroot -I$toolchain/sysroot/usr/include/aarch64-linux-android -I$toolchain/sysroot/usr/include"
+          cargo check --locked --target aarch64-linux-android --manifest-path userspace/ksud/Cargo.toml
+          cargo clippy --locked --target aarch64-linux-android --manifest-path userspace/ksud/Cargo.toml -- -D warnings
+          cargo build --locked --target aarch64-linux-android --release --manifest-path userspace/ksud/Cargo.toml
+          mkdir -p manager/app/src/main/jniLibs/arm64-v8a
+          cp "$CARGO_TARGET_DIR/aarch64-linux-android/release/ksud" manager/app/src/main/jniLibs/arm64-v8a/libksud.so
+          git diff --exit-code -- '*Cargo.lock' '*Cargo.toml'
+      - name: Test Next risk rules and bundled BusyBox
+        if: inputs.variant == 'KernelSU-Next'
+        run: node validation-tools/.github/scripts/check-next-risk.cjs "$GITHUB_WORKSPACE/source"
+      - name: Configure temporary validation signing
+        working-directory: source/manager
+        run: |
+          keytool -genkeypair -keystore validation.keystore -storepass password \
+            -keypass password -alias validation -keyalg RSA -keysize 2048 \
+            -validity 1 -dname CN=Validation
+          {
+            echo KEYSTORE_PASSWORD=password
+            echo KEY_ALIAS=validation
+            echo KEY_PASSWORD=password
+            echo KEYSTORE_FILE=validation.keystore
+          } >> gradle.properties
+      - name: Build Manager
+        working-directory: source/manager
+        run: ./gradlew clean assembleRelease --stacktrace
+      - name: Collect validation artifacts
+        env:
+          VARIANT: ${{ inputs.variant }}
+          SNAPSHOT: ${{ matrix.snapshot }}
+        run: |
+          mkdir companion-artifacts
+          cp cargo-target/aarch64-linux-android/release/ksud companion-artifacts/
+          cp source/manager/app/build/outputs/apk/release/*.apk companion-artifacts/
+          jq -n --arg variant "$VARIANT" --arg snapshot "$SNAPSHOT" \
+            --arg commit "${{ steps.source.outputs.commit }}" --arg tree "${{ steps.source.outputs.tree }}" \
+            '{variant:$variant,snapshot:$snapshot,commit:$commit,tree:$tree,signing:"validation only"}' > companion-artifacts/source.json
+          python3 -m venv artifact-check
+          artifact-check/bin/pip install pyelftools==0.32
+          artifact-check/bin/python validation-tools/.github/scripts/verify-companion.py companion-artifacts
+      - uses: actions/upload-artifact@v7
+        with:
+          name: companion-${{ inputs.variant }}-${{ matrix.snapshot }}
+          path: companion-artifacts/
+          if-no-files-found: error

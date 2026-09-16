@@ -1,0 +1,12 @@
+diff --git a/include/susfs.h b/include/susfs.h
+--- a/include/susfs.h
++++ b/include/susfs.h
+@@ -252,7 +252,7 @@
+ };
+ 
+ struct sus_kstat_v2100 {
+-    bool                    is_statically;
++    int                     is_statically;
+ 	unsigned long           target_ino;
+ 	char                    target_pathname[SUSFS_MAX_LEN_PATHNAME];
+ 	unsigned long           spoofed_ino;

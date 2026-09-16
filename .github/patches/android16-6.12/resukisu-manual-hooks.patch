@@ -9,7 +9,7 @@ Subject: [PATCH] ReSukiSU manual hooks for android16-6.12
  fs/stat.c       | 23 +++++++++++++++++++++++
  kernel/reboot.c |  9 ++++++++-
  kernel/sys.c    |  8 ++++++++
- 6 files changed, 64 insertions(+), 1 deletion(-)
+ 6 files changed, 65 insertions(+), 1 deletion(-)
 
 diff --git a/fs/exec.c b/fs/exec.c
 index 965fdc593d65..9eb6e50f1e35 100644

@@ -102,8 +102,20 @@ runs:
         # CONFIG_HEADERS_INSTALL is not set
         EOF
         
+        sed -i '/^CONFIG_KSU_SUSFS=/d; /^# CONFIG_KSU_SUSFS is not set$/d' "$DEFCONFIG"
+        if [ "${{ inputs.enable_susfs }}" = "true" ]; then
+          echo 'CONFIG_KSU_SUSFS=y' >> "$DEFCONFIG"
+        else
+          echo '# CONFIG_KSU_SUSFS is not set' >> "$DEFCONFIG"
+        fi
+
         case "${{ inputs.variant }}" in
           KernelSU-XX)
+            sed -i '/^CONFIG_KSU_KPROBES_KSUD=/d; /^CONFIG_KSU_HACK_ARM64_BRANCH_LINK=/d; /^CONFIG_KSU_TAMPER_SYSCALL_TABLE=/d' "$DEFCONFIG"
+            cat >> "$DEFCONFIG" <<-'EOF'
+        # CONFIG_KSU_KPROBES_KSUD is not set
+        # CONFIG_KSU_TAMPER_SYSCALL_TABLE is not set
+        EOF
             if [ "${{ inputs.hook_mode }}" = "hookless" ]; then
               cat >> $DEFCONFIG <<-'EOF'
         CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y
@@ -114,23 +126,16 @@ runs:
               cat >> $DEFCONFIG <<-'EOF'
         CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y
         CONFIG_KSU_HOSTSREDIRECT=y
-        # CONFIG_KSU_KPROBES_KSUD is not set
+        # CONFIG_KSU_HACK_ARM64_BRANCH_LINK is not set
         EOF
             fi
             ;;
           ReSukiSU)
-            if [ "${{ inputs.enable_susfs }}" = "true" ]; then
-              cat >> $DEFCONFIG <<-'EOF'
-        CONFIG_KSU_TOOLKIT_SUPPORT=y
-        CONFIG_KSU_SUSFS=y
-        # CONFIG_KSU_MANUAL_HOOK is not set
-        # CONFIG_KSU_TRACEPOINT_HOOK is not set
-        EOF
-            elif [ "${{ inputs.hook_mode }}" = "manual" ]; then
+            sed -i '/^CONFIG_KSU_MANUAL_HOOK=/d; /^CONFIG_KSU_TRACEPOINT_HOOK=/d' "$DEFCONFIG"
+            if [ "${{ inputs.hook_mode }}" = "manual" ]; then
               cat >> $DEFCONFIG <<-'EOF'
         CONFIG_KSU_TOOLKIT_SUPPORT=y
         CONFIG_KSU_MANUAL_HOOK=y
-        # CONFIG_KSU_SUSFS is not set
         # CONFIG_KSU_TRACEPOINT_HOOK is not set
         # CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK is not set
         # CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK is not set
@@ -139,7 +144,6 @@ runs:
               cat >> $DEFCONFIG <<-'EOF'
         CONFIG_KSU_TOOLKIT_SUPPORT=y
         CONFIG_KSU_TRACEPOINT_HOOK=y
-        # CONFIG_KSU_SUSFS is not set
         # CONFIG_KSU_MANUAL_HOOK is not set
         EOF
             fi

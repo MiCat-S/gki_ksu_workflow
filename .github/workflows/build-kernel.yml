@@ -12,6 +12,10 @@ on:
       variant:
         required: true
         type: string
+      artifact_suffix:
+        required: false
+        type: string
+        default: ''
       use_droidspaces:
         required: true
         type: boolean
@@ -111,10 +115,33 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Pull latest config
+      - name: Resolve Reviewed Stack
+        id: stack
+        env:
+          VARIANT: ${{ inputs.variant }}
+          KERNEL: ${{ inputs.kernel_version }}
+          SUBLEVEL: ${{ inputs.sub_level }}
+          USE_SUSFS: ${{ inputs.use_susfs }}
+          SUSFS_OVERRIDE: ${{ inputs.susfs_commit }}
+          HOOK: ${{ inputs.hook_mode || 'manual' }}
+          KOW_SPEC: ${{ inputs.kowsu_branch }}
+          NEXT_SPEC: ${{ inputs.kernelsu_next_branch }}
+          OFFICIAL_SPEC: ${{ inputs.kernelsu_official_branch }}
+          RE_SPEC: ${{ inputs.resukisu_branch }}
+          XX_SPEC: ${{ inputs.kernelsu_xx_branch }}
         run: |
-          git fetch origin ${{ github.ref_name }} --depth=1 2>/dev/null || true
-          git checkout FETCH_HEAD -- .github/config/kernel_versions.json 2>/dev/null || true
+          case "$VARIANT" in
+            KowSU) SPEC="$KOW_SPEC" ;;
+            KernelSU-Next) SPEC="$NEXT_SPEC" ;;
+            KernelSU-Official) SPEC="$OFFICIAL_SPEC" ;;
+            ReSukiSU) SPEC="$RE_SPEC" ;;
+            KernelSU-XX) SPEC="$XX_SPEC" ;;
+            *) echo "Unknown variant" >&2; exit 1 ;;
+          esac
+          python3 .github/scripts/resolve-stack.py \
+            --variant "$VARIANT" --kernel "$KERNEL" --sublevel "$SUBLEVEL" \
+            --susfs "$USE_SUSFS" --susfs-commit "$SUSFS_OVERRIDE" \
+            --source "$SPEC" --hook "$HOOK"
 
       - name: Load Config
         id: cfg
@@ -209,16 +236,39 @@ jobs:
               fi ;;
           esac
           retry() { for i in $(seq 1 30); do "$@" && return 0; echo "Retry $i/30..."; sleep 30; done; return 1; }
+          download_pids=()
           retry aria2c -s16 -x16 -k1M "$RELEASE_MIRROR/$CLANG_TAR" -o clang.tar.gz &
+          download_pids+=("$!")
           retry aria2c -s16 -x16 -k1M "$RELEASE_MIRROR/build-tools.tar.gz" -o build-tools.tar.gz &
-          [ "${{ steps.cfg.outputs.rust_enabled }}" = "true" ] && {
+          download_pids+=("$!")
+          if [ "${{ steps.cfg.outputs.rust_enabled }}" = "true" ]; then
             retry aria2c -s16 -x16 -k1M "$RELEASE_MIRROR/clang-tools.tar.gz" -o clang-tools.tar.gz &
+            download_pids+=("$!")
             retry aria2c -s16 -x16 -k1M "$RELEASE_MIRROR/rust-${{ steps.cfg.outputs.rust_version }}.tar.gz" -o rust.tar.gz &
+            download_pids+=("$!")
+          fi
+          if [ "${{ inputs.source_mirror }}" = "google" ]; then
+            KERNEL_URL="https://android.googlesource.com/kernel/common/+archive/${{ steps.stack.outputs.kernel_commit }}.tar.gz"
+          else
+            KERNEL_URL="$KERNEL_BASE_URL/$KERNEL_TAR"
+          fi
+          retry aria2c -s16 -x16 -k1M "$KERNEL_URL" -o common.tar.gz &
+          download_pids+=("$!")
+          for pid in "${download_pids[@]}"; do wait "$pid"; done
+          if [ "${{ inputs.source_mirror }}" != "google" ]; then
+            echo "${{ steps.stack.outputs.kernel_archive_sha256 }}  common.tar.gz" | sha256sum --check --strict
+          fi
+          extract_pids=()
+          for f in *.tar.gz; do
+            (mkdir -p "${f%%.*}" && tar -xzf "$f" -C "${f%%.*}") &
+            extract_pids+=("$!")
+          done
+          for pid in "${extract_pids[@]}"; do wait "$pid"; done
+          actual_version=$(make -s -C common kernelversion)
+          test "$actual_version" = "${{ inputs.kernel_version }}.${{ inputs.sub_level }}" || {
+            echo "::error::Kernel archive version mismatch: $actual_version"
+            exit 1
           }
-          retry aria2c -s16 -x16 -k1M "$KERNEL_BASE_URL/$KERNEL_TAR" -o common.tar.gz &
-          wait
-          for f in *.tar.gz; do mkdir -p "${f%%.*}" && tar -xzf "$f" -C "${f%%.*}" & done
-          wait
           rm -f *.tar.gz
           rm -f common/android/abi_gki_protected_exports_* || true
           [[ "${{ inputs.kernel_version }}" == "6.6" ]] && echo "device_find_any_child" >> common/android/abi_gki_aarch64_xiaomi || true
@@ -257,43 +307,21 @@ jobs:
         working-directory: kernel_workspace/common
         run: |
           mkdir -p commit_info
-          case "${{ inputs.variant }}" in
-            KowSU)
-              IFS=':' read -r REPO BRANCH <<< "${{ inputs.kowsu_branch }}"
-              git clone --branch "${BRANCH}" "https://github.com/${REPO}.git" KernelSU
-              patch -p1 -d KernelSU --forward < "${{ github.workspace }}/.github/patches/24_extra_features_for_ksu.patch" || true
-              ;;
-            KernelSU-Next)
-              IFS=':' read -r REPO BRANCH <<< "${{ inputs.kernelsu_next_branch }}"
-              git clone --branch "${BRANCH}" "https://github.com/${REPO}.git" KernelSU
-              patch -p1 -d KernelSU --forward < "${{ github.workspace }}/.github/patches/22_extra_features_for_ksu.patch" || true
-              ;;
-            KernelSU-Official)
-              IFS=':' read -r REPO BRANCH <<< "${{ inputs.kernelsu_official_branch }}"
-              git clone --branch "${BRANCH}" "https://github.com/${REPO}.git" KernelSU
-              extra_patch="${{ github.workspace }}/.github/patches/20_extra_features_for_ksu.patch"
-              if patch -p1 -d KernelSU --dry-run --forward --batch < "$extra_patch" >/dev/null 2>&1; then
-                patch -p1 -d KernelSU --forward --batch < "$extra_patch"
-              else
-                echo "::warning::Skipping incompatible KernelSU Official metadata patch"
-              fi
-              ;;
-            ReSukiSU)
-              IFS=':' read -r REPO BRANCH <<< "${{ inputs.resukisu_branch }}"
-              git clone --branch "${BRANCH}" "https://github.com/${REPO}.git" KernelSU
-              patch -p1 -d KernelSU --forward < "${{ github.workspace }}/.github/patches/23_extra_features_for_ksu.patch" || true
-              ;;
-            KernelSU-XX)
-              IFS=':' read -r REPO BRANCH <<< "${{ inputs.kernelsu_xx_branch }}"
-              git clone --branch "${BRANCH}" "https://github.com/${REPO}.git" KernelSU
-              extra_patch="${{ github.workspace }}/.github/patches/21_extra_features_for_ksu.patch"
-              if patch -p1 -d KernelSU --dry-run --forward --batch < "$extra_patch" >/dev/null; then
-                patch -p1 -d KernelSU --forward --batch < "$extra_patch"
-              else
-                echo "::warning::Skipping incompatible KernelSU-XX metadata patch"
-              fi
-              ;;
-          esac
+          FETCH_FULL_HISTORY=true bash "${{ github.workspace }}/.github/scripts/fetch-pinned.sh" \
+            KernelSU "${{ steps.stack.outputs.ksu_commit }}" \
+            "https://github.com/${{ steps.stack.outputs.ksu_repo }}.git"
+          test "$(git -C KernelSU rev-parse 'HEAD^{tree}')" = "${{ steps.stack.outputs.ksu_tree }}"
+          prefix="${{ steps.stack.outputs.ksu_prefix }}"
+          printf '%s\n' "${{ steps.stack.outputs.ksu_base }}" > "commit_info/${prefix}_upstream_commit"
+          printf '%s\n' "${{ steps.stack.outputs.ksu_tree }}" > "commit_info/${prefix}_source_tree"
+          printf '%s\n' "${{ steps.stack.outputs.kernel_commit }}" > commit_info/kernel_commit
+          git -C "${{ github.workspace }}" rev-parse HEAD > commit_info/workflow_commit
+          cp "${{ github.workspace }}/.github/config/ksu-stacks.json" commit_info/ksu-stacks.json
+          if [ "${{ inputs.use_susfs }}" = "true" ]; then
+            printf '%s\n' "${{ steps.stack.outputs.ksu_repo }}" > "commit_info/${prefix}_susfs_patch_repo"
+            printf '%s\n' "${{ steps.stack.outputs.ksu_branch }}" > "commit_info/${prefix}_susfs_patch_branch"
+            printf '%s\n' "${{ steps.stack.outputs.ksu_commit }}" > "commit_info/${prefix}_susfs_patch_commit"
+          fi
           bash "${{ github.workspace }}/.github/scripts/setup_ksu.sh"
           ln -sf ../KernelSU/kernel drivers/kernelsu
           grep -q "kernelsu" drivers/Makefile || echo 'obj-$(CONFIG_KSU) += kernelsu/' >> drivers/Makefile
@@ -305,108 +333,24 @@ jobs:
         env:
           SUSFS_DIR: ${{ github.workspace }}/susfs4ksu
           SUSFS_REPO: ${{ inputs.susfs_repo == 'GitHub' && 'https://github.com/midori01/susfs4ksu' || 'https://gitlab.com/simonpunk/susfs4ksu' }}
-          SUSFS_COMMIT: ${{ inputs.susfs_commit }}
+          SUSFS_MIRROR: ${{ inputs.susfs_repo == 'GitHub' && 'https://gitlab.com/simonpunk/susfs4ksu' || 'https://github.com/midori01/susfs4ksu' }}
+          SUSFS_COMMIT: ${{ steps.stack.outputs.susfs_commit }}
           KMI_VERSION: ${{ steps.cfg.outputs.kmi_version }}
         run: |
-          [ -n "$SUSFS_COMMIT" ] && git clone "$SUSFS_REPO" "$SUSFS_DIR" || git clone --depth 1 --no-single-branch "$SUSFS_REPO" "$SUSFS_DIR"
-          git -C "$SUSFS_DIR" checkout "${SUSFS_COMMIT:-gki-$KMI_VERSION}"
+          bash "${{ github.workspace }}/.github/scripts/fetch-pinned.sh" \
+            "$SUSFS_DIR" "$SUSFS_COMMIT" "$SUSFS_REPO" "$SUSFS_MIRROR"
           cp "$SUSFS_DIR"/kernel_patches/fs/* fs/
           cp "$SUSFS_DIR"/kernel_patches/include/linux/* include/linux/
-          if [ "${{ inputs.kernel_version }}" = "6.12" ]; then
-            PATCH_VER="$KMI_VERSION.${{ inputs.sub_level }}"
-          else
-            PATCH_VER="$KMI_VERSION"
-          fi
-
-          apply_ksu_susfs_patch() {
-            local patch_branch="$1"
-            local info_prefix="$2"
-            local patch_repo="MiCat-S/KernelSU"
-            local patch_sha
-            local patch_file
-
-            patch_sha=$(git ls-remote "https://github.com/${patch_repo}.git" "refs/heads/${patch_branch}" | awk 'NR == 1 {print $1}')
-            if [ -z "$patch_sha" ]; then
-              echo "::error::Unable to resolve ${patch_repo}:${patch_branch}"
-              return 1
-            fi
-
-            patch_file="/tmp/${info_prefix}-susfs-${patch_sha}.patch"
-            curl --fail --silent --show-error --location --retry 3 --retry-delay 2 \
-              "https://github.com/${patch_repo}/commit/${patch_sha}.patch" \
-              --output "$patch_file"
-            if [ ! -s "$patch_file" ]; then
-              echo "::error::Downloaded patch is empty: ${patch_repo}@${patch_sha}"
-              return 1
-            fi
-
-            if ! patch -p1 -d KernelSU --dry-run --forward --batch \
-              --no-backup-if-mismatch < "$patch_file"; then
-              echo "::error::SUSFS patch is incompatible with the prepared source tree: ${patch_repo}@${patch_sha}"
-              return 1
-            fi
-            if ! patch -p1 -d KernelSU --forward --batch \
-              --no-backup-if-mismatch < "$patch_file"; then
-              echo "::error::Failed to apply SUSFS patch: ${patch_repo}@${patch_sha}"
-              return 1
-            fi
-            printf '%s\n' "$patch_repo" > "commit_info/${info_prefix}_susfs_patch_repo"
-            printf '%s\n' "$patch_branch" > "commit_info/${info_prefix}_susfs_patch_branch"
-            printf '%s\n' "$patch_sha" > "commit_info/${info_prefix}_susfs_patch_commit"
-          }
-
-          case "${{ inputs.variant }}" in
-            KowSU)
-              bash "${{ github.workspace }}/.github/scripts/susfs_deinlined.sh" "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
-              patch -p1 < deinlined.patch && patch -p1 < "${{ github.workspace }}/.github/patches/55_try_umount_for_susfs.patch"
-              apply_ksu_susfs_patch kow-susfs-deinlined kowsu
-              ;;
-            KernelSU-Next)
-              patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
-              apply_ksu_susfs_patch next kernelsu_next
-              ;;
-            KernelSU-Official)
-              patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
-              patch -p1 -d KernelSU < "$SUSFS_DIR/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-              ;;
-            ReSukiSU)
-              patch -p1 < "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
-              ;;
-            KernelSU-XX)
-              bash "${{ github.workspace }}/.github/scripts/susfs_deinlined.sh" "${{ github.workspace }}/.github/patches/${{ steps.cfg.outputs.kmi_version }}/50_add_susfs_in_gki-${PATCH_VER}.patch"
-              patch -p1 < deinlined.patch && patch -p1 < "${{ github.workspace }}/.github/patches/55_try_umount_for_susfs.patch"
-              apply_ksu_susfs_patch xx kernelsu_xx
-              ;;
-          esac
-
-      - name: Apply KernelSU Official Toolkit
-        if: inputs.variant == 'KernelSU-Official'
-        working-directory: kernel_workspace/common
-        run: |
-          toolkit_patch="${{ github.workspace }}/.github/patches/30_ksu_toolkit_for_ksu.patch"
-          debris_before=$(find KernelSU -type f \( -name '*.rej' -o -name '*.orig' \) -print | sort)
-          if ! git -C KernelSU apply --check "$toolkit_patch"; then
-            echo "::error::KernelSU Official toolkit patch failed git apply validation"
-            exit 1
-          fi
-          if ! patch -p1 -d KernelSU --dry-run --forward --batch --fuzz=0 \
-            --no-backup-if-mismatch < "$toolkit_patch"; then
-            echo "::error::KernelSU Official toolkit patch is incompatible with the prepared source tree"
-            exit 1
-          fi
-          patch -p1 -d KernelSU --forward --batch --fuzz=0 \
-            --no-backup-if-mismatch < "$toolkit_patch"
-          debris_after=$(find KernelSU -type f \( -name '*.rej' -o -name '*.orig' \) -print | sort)
-          if [ "$debris_after" != "$debris_before" ]; then
-            echo "::error::KernelSU Official toolkit patch created reject or backup files"
-            [ -n "$debris_after" ] && printf '%s\n' "$debris_after"
-            exit 1
-          fi
+          for patch_file in "${{ steps.stack.outputs.patch }}" "${{ steps.stack.outputs.try_umount_patch }}"; do
+            patch -p1 --dry-run --forward --batch --fuzz=0 --no-backup-if-mismatch < "$patch_file"
+            patch -p1 --forward --batch --fuzz=0 --no-backup-if-mismatch < "$patch_file"
+          done
+          python3 "${{ github.workspace }}/.github/scripts/check-susfs-interface.py" .
 
       - name: Setup Manual Hooks
         if: >-
           (inputs.variant == 'KernelSU-XX' && inputs.hook_mode != 'hookless') ||
-          (inputs.variant == 'ReSukiSU' && inputs.hook_mode == 'manual' && inputs.use_susfs != true)
+          (inputs.variant == 'ReSukiSU' && inputs.hook_mode == 'manual')
         working-directory: kernel_workspace/common
         run: |
           case "${{ inputs.variant }}" in
@@ -431,10 +375,10 @@ jobs:
         run: |
           REKERNEL_DIR="${{ github.workspace }}/ReKernel"
           REKERNEL_X_DIR="${{ github.workspace }}/ReKernel_X"
-          git clone --filter=blob:none https://github.com/Sakion-Team/Re-Kernel "$REKERNEL_DIR"
-          git clone --filter=blob:none https://github.com/myflavor/ReKernel-X "$REKERNEL_X_DIR"
-          REKERNEL_TAG=$(git -C "$REKERNEL_DIR" describe --tags --abbrev=0) && git -C "$REKERNEL_DIR" checkout "tags/$REKERNEL_TAG"
-          REKERNEL_X_TAG=$(git -C "$REKERNEL_X_DIR" describe --tags --abbrev=0) && git -C "$REKERNEL_X_DIR" checkout "tags/$REKERNEL_X_TAG"
+          bash "${{ github.workspace }}/.github/scripts/fetch-pinned.sh" \
+            "$REKERNEL_DIR" "${{ steps.stack.outputs.rekernel_commit }}" https://github.com/Sakion-Team/Re-Kernel.git
+          bash "${{ github.workspace }}/.github/scripts/fetch-pinned.sh" \
+            "$REKERNEL_X_DIR" "${{ steps.stack.outputs.rekernel_x_commit }}" https://github.com/myflavor/ReKernel-X.git
           cp -r "$REKERNEL_DIR"/LKM-Source drivers/rekernel
           sed -i 's/depends on MODULES/depends on KSU/' drivers/rekernel/Kconfig
           sed -i 's/obj-m := rekernel.o/obj-$(CONFIG_REKERNEL) += rekernel.o/' drivers/rekernel/Makefile
@@ -444,7 +388,7 @@ jobs:
           sed -i 's/\bstart_rekernel\b/rkx_start/g; s/\bexit_rekernel\b/rkx_exit/g; s/\bsendMessage\b/rkx_sendMessage/g; s/\bnet_uid_add\b/rkx_net_uid_add/g; s/\bnet_uid_del\b/rkx_net_uid_del/g; s/\bregister_signal\b/rkx_register_signal/g; s/\bunregister_signal\b/rkx_unregister_signal/g; s/\bregister_netfilter\b/rkx_register_netfilter/g; s/\bunregister_netfilter\b/rkx_unregister_netfilter/g; s/\bregister_binder\b/rkx_register_binder/g; s/\bunregister_binder\b/rkx_unregister_binder/g' drivers/rekernel_x/*.{c,h}
           sed -i 's/obj-m += rekernel_x.o/obj-y += rekernel_x.o/' drivers/rekernel_x/Makefile
           echo 'obj-y += rekernel_x/' >> drivers/Makefile
-          echo "RKX_VERSION=v$REKERNEL_X_TAG" >> $GITHUB_ENV
+          echo "RKX_VERSION=${{ steps.stack.outputs.rekernel_x_version }}" >> $GITHUB_ENV
 
       - name: Apply Unicode Bypass Fix
         working-directory: kernel_workspace/common
@@ -517,39 +461,32 @@ jobs:
           case "${{ inputs.variant }}" in
             KowSU)
               save_ksu_commit kowsu
-              echo "${{ inputs.kowsu_branch }}" | cut -d: -f1 > "$COMMIT_DIR/kowsu_ksu_repo"
+              echo "${{ steps.stack.outputs.ksu_repo }}" > "$COMMIT_DIR/kowsu_ksu_repo"
               save_susfs_commit
               ;;
             KernelSU-Next)
               save_ksu_commit kernelsu_next
-              echo "${{ inputs.kernelsu_next_branch }}" | cut -d: -f1 > "$COMMIT_DIR/kernelsu_next_ksu_repo"
+              echo "${{ steps.stack.outputs.ksu_repo }}" > "$COMMIT_DIR/kernelsu_next_ksu_repo"
               save_susfs_commit
               ;;
             KernelSU-Official)
               save_ksu_commit kernelsu_official
-              echo "${{ inputs.kernelsu_official_branch }}" | cut -d: -f1 > "$COMMIT_DIR/kernelsu_official_ksu_repo"
+              echo "${{ steps.stack.outputs.ksu_repo }}" > "$COMMIT_DIR/kernelsu_official_ksu_repo"
               save_susfs_commit
               ;;
             ReSukiSU)
               save_ksu_commit resukisu
-              echo "${{ inputs.resukisu_branch }}" | cut -d: -f1 > "$COMMIT_DIR/resukisu_ksu_repo"
+              echo "${{ steps.stack.outputs.ksu_repo }}" > "$COMMIT_DIR/resukisu_ksu_repo"
               save_susfs_commit
               ;;
             KernelSU-XX)
               save_ksu_commit kernelsu_xx
-              echo "${{ inputs.kernelsu_xx_branch }}" | cut -d: -f1 > "$COMMIT_DIR/kernelsu_xx_ksu_repo"
+              echo "${{ steps.stack.outputs.ksu_repo }}" > "$COMMIT_DIR/kernelsu_xx_ksu_repo"
               save_susfs_commit
               ;;
           esac
           save_rekernel_commit
           save_rekernel_x_commit
-
-      - name: Upload Commit Info
-        uses: actions/upload-artifact@v7
-        with:
-          name: commit-info-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}${{ env.ADIOS_SUFFIX }}
-          path: kernel_workspace/common/commit_info/
-          retention-days: 1
 
       - name: Compile Kernel
         working-directory: kernel_workspace/common
@@ -569,8 +506,19 @@ jobs:
           export KBUILD_BUILD_USER="${{ inputs.build_user }}"
           export RKX_VERSION="${RKX_VERSION}"
           make -j$(nproc) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig
+          cp out/.config commit_info/resolved.config
+          python3 "${{ github.workspace }}/.github/scripts/check-stack-config.py" \
+            out/.config "${{ inputs.variant }}" "${{ inputs.use_susfs }}" "${{ inputs.hook_mode || 'manual' }}"
           make -j$(nproc) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error Image
           [ "${{ inputs.use_ccache }}" = "true" ] && ccache -s || true
+
+      - name: Upload Commit Info
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: commit-info-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}${{ env.ADIOS_SUFFIX }}${{ inputs.artifact_suffix }}
+          path: kernel_workspace/common/commit_info/
+          retention-days: 14
 
       - name: Verify KernelSU Official Toolkit symbols
         if: inputs.variant == 'KernelSU-Official'
@@ -674,7 +622,7 @@ jobs:
         if: inputs.upload_vmlinux
         uses: actions/upload-artifact@v7
         with:
-          name: vmlinux-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}${{ env.ADIOS_SUFFIX }}${{ env.ZRAM_SUFFIX }}
+          name: vmlinux-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}${{ env.ADIOS_SUFFIX }}${{ env.ZRAM_SUFFIX }}${{ inputs.artifact_suffix }}
           path: kernel_workspace/common/out/vmlinux.zst
           retention-days: 1
 
@@ -683,8 +631,9 @@ jobs:
         run: |
           IMAGE="common/out/arch/arm64/boot/Image"
           [ -f "$IMAGE" ] || { echo "Binary Missing!"; exit 1; }
-          ZIP_NAME="${{ inputs.variant }}_Kernel-${{ inputs.kernel_version }}.${{ steps.cfg.outputs.sub_level }}${{ steps.cfg.outputs.r_suffix }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}${{ env.ADIOS_SUFFIX }}${{ env.ZRAM_SUFFIX }}.zip"
-          git clone --depth 1 --branch ${{ steps.cfg.outputs.anykernel_branch }} https://github.com/midori01/AnyKernel3 anykernel
+          ZIP_NAME="${{ inputs.variant }}_Kernel-${{ inputs.kernel_version }}.${{ steps.cfg.outputs.sub_level }}${{ steps.cfg.outputs.r_suffix }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}${{ env.ADIOS_SUFFIX }}${{ env.ZRAM_SUFFIX }}${{ inputs.artifact_suffix }}.zip"
+          bash "${{ github.workspace }}/.github/scripts/fetch-pinned.sh" \
+            anykernel "${{ steps.stack.outputs.anykernel_commit }}" https://github.com/midori01/AnyKernel3.git
           sed -i 's/^kernel\.string=.*/kernel.string=Autlin Kernel/' anykernel/anykernel.sh
           sed -i 's/^ui_print "Flashing .*"/ui_print "Flashing Autlin Kernel..."/' anykernel/anykernel.sh
           grep -Fqx 'kernel.string=Autlin Kernel' anykernel/anykernel.sh
@@ -703,5 +652,5 @@ jobs:
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Kernel-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}${{ env.ADIOS_SUFFIX }}${{ env.ZRAM_SUFFIX }}${{ steps.cfg.outputs.r_suffix }}
+          name: Kernel-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.variant }}${{ env.SUSFS_SUFFIX }}${{ env.DS_SUFFIX }}${{ env.ADIOS_SUFFIX }}${{ env.ZRAM_SUFFIX }}${{ steps.cfg.outputs.r_suffix }}${{ inputs.artifact_suffix }}
           path: kernel_workspace/${{ env.ZIP_NAME }}
