@@ -19,6 +19,7 @@ def load(name):
 
 resolver = load("resolve-stack")
 interface = load("check-susfs-interface")
+config_check = load("check-stack-config")
 
 
 class StackTests(unittest.TestCase):
@@ -74,6 +75,25 @@ class StackTests(unittest.TestCase):
     def test_unknown_revision_is_rejected(self):
         with self.assertRaises(KeyError):
             self.resolve(sublevel="92")
+
+    def test_try_umount_capability_must_match_variant(self):
+        with tempfile.TemporaryDirectory() as temp:
+            config = Path(temp) / ".config"
+            common = "CONFIG_KSU=y\nCONFIG_KSU_SUSFS=y\n"
+            common += "".join(f"CONFIG_KSU_SUSFS_{name}=y\n" for name in (
+                "SUS_PATH", "SUS_MOUNT", "SUS_KSTAT", "OPEN_REDIRECT", "SUS_MAP"))
+            config.write_text(common)
+            config_check.check(config, "KernelSU-Official", True, "manual")
+            with self.assertRaises(ValueError):
+                config_check.check(config, "KowSU", True, "manual")
+            config.write_text(common + "CONFIG_KSU_SUSFS_TRY_UMOUNT=y\n")
+            config_check.check(config, "KowSU", True, "manual")
+            config_check.check(config, "KernelSU-XX", True, "manual")
+            with self.assertRaises(ValueError):
+                config_check.check(config, "KernelSU-Official", True, "manual")
+            config.write_text("CONFIG_KSU=y\nCONFIG_KSU_SUSFS_TRY_UMOUNT=y\n")
+            with self.assertRaises(ValueError):
+                config_check.check(config, "KowSU", False, "manual")
 
     def test_complete_manifest(self):
         self.assertEqual(set(self.manifest["variants"]),

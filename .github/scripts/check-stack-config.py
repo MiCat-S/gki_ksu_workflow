@@ -15,6 +15,7 @@ def check(path, variant, susfs, hook):
 
     expect("KSU", True)
     expect("KSU_SUSFS", susfs)
+    expect("KSU_SUSFS_TRY_UMOUNT", susfs and variant in ("KowSU", "KernelSU-XX"))
     if susfs:
         for feature in ("SUS_PATH", "SUS_MOUNT", "SUS_KSTAT", "OPEN_REDIRECT", "SUS_MAP"):
             expect(f"KSU_SUSFS_{feature}", True)

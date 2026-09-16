@@ -157,6 +157,7 @@ on:
           - pre-release
           - no-release
           - validate-stack
+          - validate-companions
       cleanup_tags:
         description: "Cleanup Old Releases"
         type: boolean
@@ -169,14 +170,15 @@ permissions:
 
 jobs:
   validation:
-    if: inputs.release_type == 'validate-stack'
+    if: startsWith(inputs.release_type, 'validate-')
     uses: ./.github/workflows/validate-stack.yml
     with:
       group: ${{ inputs.ksu_variant }}
       susfs: both
+      component: ${{ inputs.release_type == 'validate-companions' && 'companions' || 'all' }}
 
   setup:
-    if: inputs.release_type != 'validate-stack'
+    if: "!startsWith(inputs.release_type, 'validate-')"
     runs-on: ubuntu-latest
     outputs:
       release_tag: ${{ steps.config.outputs.release_tag }}
@@ -364,7 +366,7 @@ jobs:
       upload_vmlinux: ${{ inputs.upload_vmlinux }}
 
   susfs-tools:
-    if: inputs.enable_susfs && inputs.release_type != 'validate-stack'
+    if: inputs.enable_susfs && !startsWith(inputs.release_type, 'validate-')
     uses: ./.github/workflows/build-susfs-tools.yml
 
   release:
@@ -372,7 +374,7 @@ jobs:
     if: |
       always() &&
       inputs.release_type != 'no-release' &&
-      inputs.release_type != 'validate-stack' &&
+      !startsWith(inputs.release_type, 'validate-') &&
       needs.setup.result == 'success' &&
       needs.build.result == 'success' &&
       (!inputs.enable_susfs || needs.susfs-tools.result == 'success')
@@ -543,5 +545,5 @@ jobs:
 
   cleanup:
     needs: release
-    if: inputs.release_type != 'validate-stack' && inputs.cleanup_tags && (success() || failure())
+    if: "!startsWith(inputs.release_type, 'validate-') && inputs.cleanup_tags && (success() || failure())"
     uses: ./.github/workflows/cleanup-tags.yml

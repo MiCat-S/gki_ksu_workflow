@@ -12,6 +12,10 @@ on:
         type: string
         required: false
         default: both
+      component:
+        type: string
+        required: false
+        default: all
   workflow_dispatch:
     inputs:
       group:
@@ -26,6 +30,12 @@ on:
         required: true
         default: both
         options: [both, 'on', 'off']
+      component:
+        description: 'Validation components'
+        type: choice
+        required: true
+        default: all
+        options: [all, kernels, companions, tools]
 
 permissions:
   contents: read
@@ -43,6 +53,7 @@ jobs:
         env:
           GROUP: ${{ inputs.group }}
           SUSFS: ${{ inputs.susfs }}
+          COMPONENT: ${{ inputs.component }}
         run: |
           python3 .github/scripts/test-stacks.py -v
           python3 -m venv config-check
@@ -54,6 +65,8 @@ jobs:
                    "KernelSU-Official": ["manual"], "KernelSU-XX": ["manual", "hookless"],
                    "ReSukiSU": ["manual", "tracepoint"]}
           group = os.environ["GROUP"]
+          component = os.environ["COMPONENT"]
+          assert component in ("all", "kernels", "companions", "tools")
           selected = list(hooks) if group in ("all", "additional-bases") else [group]
           states = [True, False] if os.environ["SUSFS"] == "both" else [os.environ["SUSFS"] == "on"]
           include = []
@@ -71,11 +84,13 @@ jobs:
               output.write("kernels=" + json.dumps({"include": include}) + "\n")
               output.write("companions=" + json.dumps(selected) + "\n")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
-              summary.write(f"Kernel jobs: {len(include)}. Full five-variant on/off coverage on three KMI baselines; additional bases use KowSU/SUSFS-on. This is not every Cartesian combination.\n")
+              count = len(include) if component in ("all", "kernels") else 0
+              summary.write(f"Component: {component}; group: {group}; kernel jobs: {count}. The all group covers five variants on/off on three KMI baselines; additional bases use KowSU/SUSFS-on. This is not every Cartesian combination.\n")
           PY
 
   kernels:
     needs: matrix
+    if: inputs.component == 'all' || inputs.component == 'kernels'
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -103,10 +118,12 @@ jobs:
       build_host: build-host
 
   susfs-tools:
+    if: inputs.component == 'all' || inputs.component == 'tools'
     uses: ./.github/workflows/build-susfs-tools.yml
 
   companions:
     needs: matrix
+    if: inputs.component == 'all' || inputs.component == 'companions'
     strategy:
       fail-fast: false
       matrix:

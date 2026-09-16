@@ -17,6 +17,8 @@ jobs:
         snapshot: [extra, integration]
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      RUST_TOOLCHAIN: ${{ inputs.variant == 'ReSukiSU' && 'nightly-2026-09-15' || '1.98.1' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -46,8 +48,10 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - name: Setup Rust
         run: |
-          rustup toolchain install 1.98.1 --profile minimal --component clippy --component rustfmt --target aarch64-linux-android
-          rustup default 1.98.1
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component clippy --component rustfmt --target aarch64-linux-android
+          rustup default "$RUST_TOOLCHAIN"
+          rustc -Vv
+          cargo -V
           sudo apt-get update
           sudo apt-get install -y libclang-dev
       - uses: nttld/setup-ndk@v1
@@ -100,7 +104,8 @@ jobs:
           cp source/manager/app/build/outputs/apk/release/*.apk companion-artifacts/
           jq -n --arg variant "$VARIANT" --arg snapshot "$SNAPSHOT" \
             --arg commit "${{ steps.source.outputs.commit }}" --arg tree "${{ steps.source.outputs.tree }}" \
-            '{variant:$variant,snapshot:$snapshot,commit:$commit,tree:$tree,signing:"validation only"}' > companion-artifacts/source.json
+            --arg toolchain "$RUST_TOOLCHAIN" --arg workflow "${{ github.sha }}" \
+            '{variant:$variant,snapshot:$snapshot,commit:$commit,tree:$tree,toolchain:$toolchain,workflow:$workflow,signing:"validation only"}' > companion-artifacts/source.json
           python3 -m venv artifact-check
           artifact-check/bin/pip install pyelftools==0.32
           artifact-check/bin/python validation-tools/.github/scripts/verify-companion.py companion-artifacts

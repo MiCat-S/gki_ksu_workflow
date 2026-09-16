@@ -18,7 +18,7 @@ base. An unreviewed source or SUSFS override fails before toolchain downloads.
 The integration branch remains three commits above its upstream base: inherited
 CI removal, common extra features/fixes, and a complete SUSFS integration patch.
 The final commit must remain independently replayable on its parent. Do not append
-a small fix as a fourth commit and make it the branch's HEAD.patch.
+  a small fix as a fourth commit and make it the branch's HEAD.patch.
 
 ## Updating
 
@@ -48,6 +48,9 @@ The all-variants CI mode runs 48 kernel jobs:
 Companion jobs build both source snapshots for each variant with locked Cargo
 dependencies and temporary validation signing. APK-embedded ARM64 ksud must match
 the standalone ELF's runtime sections and load segments.
+ReSukiSU uses pinned `nightly-2026-09-15` for its upstream `decl_macro` feature;
+the other variants use Rust `1.98.1`. The `validate-companions` release type runs
+only the Android checks for diagnosis. It does not replace full stack acceptance.
 
 This is representative compilation plus all-base patch coverage, not every
 126-way Cartesian combination and not a substitute for hardware testing.
