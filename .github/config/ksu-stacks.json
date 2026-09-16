@@ -23,12 +23,12 @@
       "branch": "next",
       "prefix": "kernelsu_next",
       "extra": {
-        "commit": "2ab5391ef07f1ef9b7d1415d84c0d4638cb06950",
-        "tree": "48ae06be4ab36cf688a7cb5a44fadabb10953ab8"
+        "commit": "a382e30109756c270dd88b22a10c074b651d4e31",
+        "tree": "ebb696bbebeaf16846dae4bbb467bd2066b8a2a1"
       },
       "integration": {
-        "commit": "7a6154c5befb556b9ddd6e6065f6eacb288f949d",
-        "tree": "f2e6859970de6a235bc659fbef01605976bbb913"
+        "commit": "c40353f038a2834425132b916da3c6f9e34f4b4b",
+        "tree": "0abcd240c2403415b0ec1689ffa9557b1e1ddf63"
       }
     },
     "KernelSU-Official": {

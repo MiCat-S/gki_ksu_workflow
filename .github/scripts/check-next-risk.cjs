@@ -28,6 +28,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow = "1"
 const_format = "0.2"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
@@ -46,6 +47,8 @@ pub mod utils {
 }
 #[path = ${JSON.stringify(path.join(root, 'userspace/ksud/src/risk.rs'))}]
 pub mod risk;
+#[path = ${JSON.stringify(path.join(root, 'userspace/ksud/src/susfs_response.rs'))}]
+pub mod susfs_response;
 `);
 const locked = spawnSync('cargo', ['generate-lockfile', '--manifest-path', path.join(temp, 'Cargo.toml')],
   { stdio: 'inherit' });
