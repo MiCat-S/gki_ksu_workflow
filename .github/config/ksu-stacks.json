@@ -102,8 +102,8 @@
       },
       "kernels": {
         "172": {
-          "commit": "a53ef9cd393f13067c8fd0fec547c662158e8cba",
-          "archive_sha256": "ad3769b9af38ba48e07c80508540eb19f667cd574ec964d1660e923d88858221",
+          "commit": "bc182ca54a296570bc242feecc1ce0409217230f",
+          "archive_sha256": "4e06e95c1de4b5701dd35a2174c9a91d9db32528d21ac08b0df5e4084b7be438",
           "patch_key": "6.1"
         },
         "177": {
@@ -183,8 +183,8 @@
           "patch_key": "69"
         },
         "81": {
-          "commit": "22e6fa8430bffa2fc3985cfdacfe122220f650fa",
-          "archive_sha256": "bfbec99f4607f09d7d5a5f2a5fe0c111758f409a918d4e05388188c2a0eef81b",
+          "commit": "69ff787e893f8e8722a56b7d3a7d0f0ea6f777f2",
+          "archive_sha256": "6601402f477474a8cfc15aa2f801e28f5675320a454ada4654db69d1d9ec8739",
           "patch_key": "81"
         },
         "93": {

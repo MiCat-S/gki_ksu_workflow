@@ -13,7 +13,7 @@
       "output_50": "android14-6.1/50_add_susfs_in_gki-android14-6.1.patch",
       "output_51": "android14-6.1/51_susfs_deinlined_in_gki-android14-6.1.patch",
       "baselines": [
-        "a53ef9cd393f13067c8fd0fec547c662158e8cba",
+        "bc182ca54a296570bc242feecc1ce0409217230f",
         "38c2ee7f1213aaa84824aa93e0fbfb80bdb3efb6"
       ]
     },
@@ -75,7 +75,7 @@
       "output_50": "android16-6.12/50_add_susfs_in_gki-android16-6.12.81.patch",
       "output_51": "android16-6.12/51_susfs_deinlined_in_gki-android16-6.12.81.patch",
       "baselines": [
-        "22e6fa8430bffa2fc3985cfdacfe122220f650fa"
+        "69ff787e893f8e8722a56b7d3a7d0f0ea6f777f2"
       ]
     },
     {
