@@ -44,6 +44,26 @@ def generate(group, state, component):
 
 
 class MatrixTests(unittest.TestCase):
+    def test_dispatch_contract_and_component_job_gates(self):
+        triggers = WORKFLOW.get("on", WORKFLOW.get(True))
+        dispatch = triggers["workflow_dispatch"]["inputs"]
+        reusable = triggers["workflow_call"]["inputs"]
+        options = {
+            "group": {*HOOKS, "all", "additional-bases"},
+            "susfs": {"on", "off", "both"},
+            "component": {"all", "kernels", "companions", "tools"},
+        }
+        defaults = {"group": "all", "susfs": "both", "component": "all"}
+        for name in options:
+            self.assertEqual(set(dispatch[name]["options"]), options[name])
+            self.assertEqual(dispatch[name]["default"], defaults[name])
+            self.assertEqual(reusable[name]["default"], defaults[name])
+        for job, component in (("kernels", "kernels"), ("companions", "companions"),
+                               ("susfs-tools", "tools")):
+            self.assertEqual(
+                WORKFLOW["jobs"][job]["if"],
+                f"inputs.component == 'all' || inputs.component == '{component}'")
+
     def test_every_supported_selection_has_exact_coverage(self):
         for group in (*HOOKS, "all", "additional-bases"):
             for state in ("on", "off", "both"):

@@ -389,6 +389,7 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(len(config["profiles"]), len(patches))
         actual_paths = set()
         for profile in config["profiles"]:
+            self.assertEqual(profile["input_path"], ".github/patches/" + profile["output_50"])
             path_51 = ".github/patches/" + profile["output_51"]
             actual_paths.add(path_51)
             commit, digest, sources = patches[path_51]
