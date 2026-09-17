@@ -59,19 +59,24 @@ python3 .github/scripts/sync_susfs_patches.py \
 python3 .github/scripts/test-sync-susfs-patches.py -v
 ```
 
-The upstream screenshot-only `sync_susfs_patches.py` implementation is not
-publicly available and was not copied. No ten-second runtime claim is made here;
+The upstream screenshot-only `sync_susfs_patches.py` implementation was not found
+in the reviewed public upstream tree and was not copied. No ten-second runtime claim is made here;
 this implementation independently enforces the repository's reviewed-input and
 strict-replay requirements.
 
 ## Validation Coverage
 
-The all-variants CI mode runs 48 kernel jobs:
+The all-variants CI mode with SUSFS `both` runs 54 kernel jobs:
 
 - 6.1.177, 6.6.143 and 6.12.23: all five variants, XX manual/hookless and
   ReSukiSU manual/tracepoint, each with SUSFS on and off (42 jobs).
 - 6.1.172, 6.6.139, 6.12.38, 6.12.69, 6.12.81 and 6.12.93:
-  KowSU with SUSFS on (6 jobs).
+  KowSU with SUSFS on and off (12 jobs).
+
+Both primary and additional baselines honor the selected SUSFS state.
+`all/on` runs 27 kernel jobs; `additional-bases/off` runs 6. These two selections
+cover this SUSFS update and both new kernel revisions without rebuilding the
+unchanged primary SUSFS-off inputs.
 
 Companion jobs build both source snapshots for each variant with locked Cargo
 dependencies and temporary validation signing. APK-embedded ARM64 ksud must match

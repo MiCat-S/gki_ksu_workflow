@@ -71,7 +71,7 @@
 > - `tracepoint` — 仅限 ReSukiSU
 
 > [!TIP]
-> **矩阵构建编排：** 普通构建按所选变体和子版本各产出一个内核包，6.12 使用所选 `kernel_sublevel`，默认仍为 `23`。独立的 `validate-stack` 模式执行 48 组代表性内核构建、10 组 Android 配套构建及配对 SUSFS 模块构建，不创建 Release。
+> **矩阵构建编排：** 普通构建按所选变体和子版本各产出一个内核包，6.12 使用所选 `kernel_sublevel`，默认仍为 `23`。独立的 `validate-stack` 模式执行 54 组代表性内核构建、10 组 Android 配套构建及配对 SUSFS 模块构建，不创建 Release。
 
 ---
 

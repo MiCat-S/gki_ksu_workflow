@@ -371,6 +371,36 @@ class SyncTests(unittest.TestCase):
             with self.subTest(fix=name), self.assertRaises(sync.SyncError):
                 sync.validate_fix_coverage(SOURCE, PATCH, broken)
 
+    def test_reviewed_sync_inputs_match_the_production_stack(self):
+        config_path = ROOT / ".github/config/susfs-sync.json"
+        config = sync.load_config(config_path)
+        baselines = sync.load_baseline_manifest(
+            config_path.parent / config["baseline_manifest"])
+        production = json.loads((ROOT / ".github/config/ksu-stacks.json").read_text())
+        self.assertEqual(config["reference_workflow"], production["reference_workflow"])
+        patches = {}
+        expected_baselines = set()
+        for profile in production["profiles"].values():
+            for key, patch in profile["patch"].items():
+                sources = {item["commit"] for item in profile["kernels"].values()
+                           if item["patch_key"] == key}
+                patches[patch["path"]] = (profile["commit"], patch["sha256"], sources)
+                expected_baselines.update(sources)
+        self.assertEqual(len(config["profiles"]), len(patches))
+        actual_paths = set()
+        for profile in config["profiles"]:
+            path_51 = ".github/patches/" + profile["output_51"]
+            actual_paths.add(path_51)
+            commit, digest, sources = patches[path_51]
+            self.assertEqual(profile["susfs_commit"], commit)
+            self.assertEqual(set(profile["baselines"]), sources)
+            self.assertEqual(hashlib.sha256((ROOT / path_51).read_bytes()).hexdigest(), digest)
+            path_50 = ROOT / ".github/patches" / profile["output_50"]
+            self.assertEqual(hashlib.sha256(path_50.read_bytes()).hexdigest(),
+                             profile["input_sha256"])
+        self.assertEqual(actual_paths, set(patches))
+        self.assertEqual(set(baselines["baselines"]), expected_baselines)
+
 
 if __name__ == "__main__":
     unittest.main()

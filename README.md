@@ -72,7 +72,7 @@ See [Reviewed Stacks](docs/REVIEWED_STACKS.md) for updates and acceptance covera
 > - `tracepoint` — ReSukiSU only
 
 > [!TIP]
-> **Matrix Build Orchestration:** Normal builds produce one kernel artifact per selected variant and sublevel. Kernel 6.12 uses the selected `kernel_sublevel` (default `23`). The separate `validate-stack` mode runs 48 representative kernel builds, 10 Android companion builds and one paired SUSFS module build without publishing a release.
+> **Matrix Build Orchestration:** Normal builds produce one kernel artifact per selected variant and sublevel. Kernel 6.12 uses the selected `kernel_sublevel` (default `23`). The separate `validate-stack` mode runs 54 representative kernel builds, 10 Android companion builds and one paired SUSFS module build without publishing a release.
 
 ---
 
