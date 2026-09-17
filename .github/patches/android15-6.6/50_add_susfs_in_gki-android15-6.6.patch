@@ -1,34 +1,34 @@
 From: midori01 <lv@lvlv.lv>
-Date: Sun, 13 Sep 2026 16:19:49 +0900
+Date: Wed, 16 Sep 2026 07:41:14 +0900
 Subject: [PATCH] SUSFS inline hooks for gki-android15-6.6-lts
 
 ---
  drivers/input/input.c          |  10 ++
  fs/Makefile                    |   2 +
- fs/exec.c                      |  37 +++++
- fs/namei.c                     | 232 +++++++++++++++++++++++++++++++
- fs/namespace.c                 | 246 +++++++++++++++++++++++++++++++++
- fs/notify/fdinfo.c             |  78 +++++++++++
- fs/open.c                      |  28 ++++
+ fs/exec.c                      |  37 ++++++
+ fs/namei.c                     | 239 ++++++++++++++++++++++++++++++++++++++
+ fs/namespace.c                 | 255 +++++++++++++++++++++++++++++++++++++++++
+ fs/notify/fdinfo.c             |  78 +++++++++++++
+ fs/open.c                      |  28 +++++
  fs/proc/base.c                 |  24 ++++
- fs/proc/bootconfig.c           |  13 ++
- fs/proc/fd.c                   |  71 ++++++++++
- fs/proc/task_mmu.c             |  71 ++++++++++
- fs/proc_namespace.c            | 178 ++++++++++++++++++++++++
+ fs/proc/bootconfig.c           |  13 +++
+ fs/proc/fd.c                   |  71 ++++++++++++
+ fs/proc/task_mmu.c             |  71 ++++++++++++
+ fs/proc_namespace.c            | 178 ++++++++++++++++++++++++++++
  fs/read_write.c                |  10 ++
- fs/readdir.c                   | 126 +++++++++++++++++
- fs/stat.c                      |  82 +++++++++++
- fs/statfs.c                    |  67 +++++++++
+ fs/readdir.c                   | 126 ++++++++++++++++++++
+ fs/stat.c                      |  82 +++++++++++++
+ fs/statfs.c                    |  67 +++++++++++
  fs/super.c                     |  24 ++++
  kernel/kallsyms.c              |  31 +++++
  kernel/reboot.c                |  12 ++
- kernel/sys.c                   |  15 ++
- mm/memory.c                    |  13 ++
- security/selinux/avc.c         |  20 ++
- security/selinux/hooks.c       |  45 ++++++
- security/selinux/selinuxfs.c   | 147 ++++++++++++++++++++
+ kernel/sys.c                   |  15 +++
+ mm/memory.c                    |  13 +++
+ security/selinux/avc.c         |  20 ++++
+ security/selinux/hooks.c       |  45 ++++++++
+ security/selinux/selinuxfs.c   | 147 ++++++++++++++++++++++++
  security/selinux/ss/services.c |  24 ++++
- 25 files changed, 1606 insertions(+)
+ 25 files changed, 1622 insertions(+)
 
 diff --git a/drivers/input/input.c b/drivers/input/input.c
 index 9bb1d3de723e..a6333655c906 100644
@@ -145,7 +145,7 @@ index 8dc93215b9c9..c761662cd2fa 100644
  	free_bprm(bprm);
  
 diff --git a/fs/namei.c b/fs/namei.c
-index b31b583f1878..cd474d316834 100644
+index b31b583f1878..7f7229472774 100644
 --- a/fs/namei.c
 +++ b/fs/namei.c
 @@ -41,10 +41,21 @@
@@ -408,7 +408,7 @@ index b31b583f1878..cd474d316834 100644
  
  	nd->flags |= op->intent;
  
-@@ -3743,9 +3872,31 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
+@@ -3743,9 +3872,33 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
  		const struct open_flags *op,
  		struct file *file)
  {
@@ -416,6 +416,7 @@ index b31b583f1878..cd474d316834 100644
 +	int old_dfd = nd->dfd;
 +	bool is_nd_state_root_preset = (nd->state & ND_ROOT_PRESET);
 +	struct filename *fake_filename = NULL;
++	struct filename *old_name = nd->name;
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  	struct path path;
  	int error = path_lookupat(nd, flags | LOOKUP_DIRECTORY, &path);
@@ -426,21 +427,22 @@ index b31b583f1878..cd474d316834 100644
 +	{
 +		fake_filename = susfs_open_redirect_spoof_do_sys_openat(path.dentry->d_inode);
 +		if (fake_filename && !IS_ERR(fake_filename)) {
++			struct path fake_path;
++
++			error = filename_lookup(old_dfd, fake_filename, flags | LOOKUP_DIRECTORY, &fake_path, NULL);
 +			path_put(&path);
-+			restore_nameidata();
-+			set_nameidata(nd, old_dfd, fake_filename, NULL);
-+			error = path_lookupat(nd, flags | LOOKUP_DIRECTORY, &path);
 +			if (unlikely(error)) {
 +				putname(fake_filename);
 +				return error;
 +			}
++			path = fake_path;
 +		}
 +	}
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  	if (unlikely(error))
  		return error;
  	error = mnt_want_write(path.mnt);
-@@ -3759,24 +3910,59 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
+@@ -3759,24 +3912,62 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
  	mnt_drop_write(path.mnt);
  out:
  	path_put(&path);
@@ -457,6 +459,7 @@ index b31b583f1878..cd474d316834 100644
 +	int old_dfd = nd->dfd;
 +	bool is_nd_state_root_preset = (nd->state & ND_ROOT_PRESET);
 +	struct filename *fake_filename = NULL;
++	struct filename *old_name = nd->name;
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  	struct path path;
  	int error = path_lookupat(nd, flags, &path);
@@ -467,14 +470,15 @@ index b31b583f1878..cd474d316834 100644
 +		{
 +			fake_filename = susfs_open_redirect_spoof_do_sys_openat(path.dentry->d_inode);
 +			if (fake_filename && !IS_ERR(fake_filename)) {
++				struct path fake_path;
++
++				error = filename_lookup(old_dfd, fake_filename, flags, &fake_path, NULL);
 +				path_put(&path);
-+				restore_nameidata();
-+				set_nameidata(nd, old_dfd, fake_filename, NULL);
-+				error = path_lookupat(nd, flags, &path);
 +				if (unlikely(error)) {
 +					putname(fake_filename);
 +					return error;
 +				}
++				path = fake_path;
 +			}
 +		}
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
@@ -496,11 +500,12 @@ index b31b583f1878..cd474d316834 100644
 +	int old_dfd = nd->dfd;
 +	bool is_nd_state_root_preset = (nd->state & ND_ROOT_PRESET);
 +	struct filename *fake_filename = NULL;
++	struct filename *old_name = nd->name;
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  	struct file *file;
  	int error;
  
-@@ -3793,10 +3979,31 @@ static struct file *path_openat(struct nameidata *nd,
+@@ -3793,10 +3984,33 @@ static struct file *path_openat(struct nameidata *nd,
  		while (!(error = link_path_walk(s, nd)) &&
  		       (s = open_last_lookups(nd, file, op)) != NULL)
  			;
@@ -526,13 +531,15 @@ index b31b583f1878..cd474d316834 100644
  		terminate_walk(nd);
  	}
 +#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
-+	if (fake_filename && !IS_ERR(fake_filename))
++	if (fake_filename && !IS_ERR(fake_filename)) {
++		nd->name = old_name;
 +		putname(fake_filename);
++	}
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  	if (likely(!error)) {
  		if (likely(file->f_mode & FMODE_OPENED))
  			return file;
-@@ -5105,6 +5312,11 @@ int readlink_copy(char __user *buffer, int buflen, const char *link)
+@@ -5105,6 +5319,11 @@ int readlink_copy(char __user *buffer, int buflen, const char *link)
   *
   * Does not call security hook.
   */
@@ -544,7 +551,7 @@ index b31b583f1878..cd474d316834 100644
  int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  {
  	struct inode *inode = d_inode(dentry);
-@@ -5114,7 +5326,18 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
+@@ -5114,7 +5333,18 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  
  	if (unlikely(!(inode->i_opflags & IOP_DEFAULT_READLINK))) {
  		if (unlikely(inode->i_op->readlink))
@@ -563,7 +570,7 @@ index b31b583f1878..cd474d316834 100644
  
  		if (!d_is_symlink(dentry))
  			return -EINVAL;
-@@ -5130,6 +5353,15 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
+@@ -5130,6 +5360,15 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  		if (IS_ERR(link))
  			return PTR_ERR(link);
  	}
@@ -580,7 +587,7 @@ index b31b583f1878..cd474d316834 100644
  	do_delayed_call(&done);
  	return res;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 97fc4227773f..32571fabba3f 100644
+index 97fc4227773f..8dabeedd36bc 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -32,12 +32,22 @@
@@ -870,7 +877,7 @@ index 97fc4227773f..32571fabba3f 100644
  	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
  	if (IS_ERR(new)) {
  		namespace_unlock();
-@@ -5080,3 +5295,34 @@ static int __init init_fs_namespace_sysctls(void)
+@@ -5080,3 +5295,43 @@ static int __init init_fs_namespace_sysctls(void)
  fs_initcall(init_fs_namespace_sysctls);
  
  #endif /* CONFIG_SYSCTL */
@@ -880,6 +887,9 @@ index 97fc4227773f..32571fabba3f 100644
 +int susfs_get_non_sus_mnt_id_from_mnt(struct mount *orig_mnt) {
 +	struct mount *mnt = orig_mnt;
 +	int mnt_id;
++
++	if (mnt->mnt_id < DEFAULT_KSU_MNT_ID)
++		return mnt->mnt_id;
 +
 +	lock_mount_hash();
 +	for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
@@ -891,6 +901,12 @@ index 97fc4227773f..32571fabba3f 100644
 +/* - To retrieve the non sus vfsmount from vfsmount, takes a reference on &mnt->mnt and mnt->mnt.mnt_root */
 +struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt) {
 +	struct mount *mnt = real_mount(vfsmnt);
++
++	if (mnt->mnt_id < DEFAULT_KSU_MNT_ID) {
++		mntget(&mnt->mnt);
++		dget(mnt->mnt.mnt_root);
++		return &mnt->mnt;
++	}
 +
 +	lock_mount_hash();
 +	for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
@@ -1926,7 +1942,7 @@ index c8c46e294431..a18bb8379a21 100644
  	if (error >= 0)
  		error = buf.error;
 diff --git a/fs/stat.c b/fs/stat.c
-index 517fa4ed885e..f4021d9f43eb 100644
+index 517fa4ed885e..5a4013d24c8d 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -20,12 +20,27 @@
@@ -2359,7 +2375,7 @@ index 1f8011193ac2..b5ea7422342b 100644
  		if (IS_ERR_OR_NULL(page)) {
  			/* We might need to expand the stack to access it */
 diff --git a/security/selinux/avc.c b/security/selinux/avc.c
-index 8e40b0941d1c..629658620f89 100644
+index 8e40b0941d1c..86aa39a229d1 100644
 --- a/security/selinux/avc.c
 +++ b/security/selinux/avc.c
 @@ -48,6 +48,12 @@
@@ -2716,6 +2732,3 @@ index e5d143145c0a..17a37b5a00b7 100644
  static int security_validtrans_handle_fail(struct selinux_policy *policy,
  					struct sidtab_entry *oentry,
  					struct sidtab_entry *nentry,
--- 
-2.55.0
-

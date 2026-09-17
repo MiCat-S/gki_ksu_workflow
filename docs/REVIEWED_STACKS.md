@@ -36,6 +36,34 @@ The final commit must remain independently replayable on its parent. Do not appe
    That mode creates artifacts only and never publishes or cleans releases.
 7. Review all failed jobs and artifacts before promoting formal branches.
 
+### Maintainer candidate generation
+
+`.github/scripts/sync_susfs_patches.py` is a candidate generator, not a build
+input updater. It reads the fixed objects in `.github/config/susfs-sync.json`,
+checks the SUSFS source and upstream patch hashes, runs the fail-closed de-inline
+converter, verifies every regular file and mode in the reviewed partial-kernel
+manifest, reconstructs those partial trees in isolated temporary directories,
+and replays each generated patch with zero fuzz and zero offset. `.git`, symlink,
+special-file and unreviewed-file entries are rejected. Only a complete successful
+batch is atomically published to the requested output directory. The script does
+not fetch, checkout, reset or clean input repositories, and it does not modify
+`ksu-stacks.json` or checked-in production patches.
+
+```bash
+python3 .github/scripts/sync_susfs_patches.py \
+  --workflow-repo /path/to/gki_ksu_workflow \
+  --susfs-repo /path/to/susfs4ksu \
+  --kernel-cache /path/to/reviewed-kernel-cache \
+  --output /path/to/new-candidate-directory
+
+python3 .github/scripts/test-sync-susfs-patches.py -v
+```
+
+The upstream screenshot-only `sync_susfs_patches.py` implementation is not
+publicly available and was not copied. No ten-second runtime claim is made here;
+this implementation independently enforces the repository's reviewed-input and
+strict-replay requirements.
+
 ## Validation Coverage
 
 The all-variants CI mode runs 48 kernel jobs:

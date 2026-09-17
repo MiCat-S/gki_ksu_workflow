@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "reference_workflow": "d986f9d2afa734e4d6bc181ab79b6b348d1c3113",
+  "baseline_manifest": "susfs-kernel-baselines.json",
+  "source_path": "kernel_patches/fs/susfs.c",
+  "profiles": [
+    {
+      "name": "android14-6.1",
+      "susfs_commit": "596ec8fcdcb5a6ee366494304333c7fdc76d8862",
+      "source_sha256": "7914ce0b0779a228c6fd8612c37596dd05a3b5ccd3d784a997431a8ff2409897",
+      "input_path": ".github/patches/android14-6.1/50_add_susfs_in_gki-android14-6.1.patch",
+      "input_sha256": "da937599a09b383a03b672a49a07ece986ee8283b12c08089ec009c827e83d3e",
+      "output_50": "android14-6.1/50_add_susfs_in_gki-android14-6.1.patch",
+      "output_51": "android14-6.1/51_susfs_deinlined_in_gki-android14-6.1.patch",
+      "baselines": [
+        "a53ef9cd393f13067c8fd0fec547c662158e8cba",
+        "38c2ee7f1213aaa84824aa93e0fbfb80bdb3efb6"
+      ]
+    },
+    {
+      "name": "android15-6.6",
+      "susfs_commit": "72997d308cf0d55003ad4695ebde130ef9fc5201",
+      "source_sha256": "7914ce0b0779a228c6fd8612c37596dd05a3b5ccd3d784a997431a8ff2409897",
+      "input_path": ".github/patches/android15-6.6/50_add_susfs_in_gki-android15-6.6.patch",
+      "input_sha256": "37c83bc24585077a272d4375589ea39e3994614695a7458e5596c45ce6c3326a",
+      "output_50": "android15-6.6/50_add_susfs_in_gki-android15-6.6.patch",
+      "output_51": "android15-6.6/51_susfs_deinlined_in_gki-android15-6.6.patch",
+      "baselines": [
+        "58344949eedf2ab857ccc4c6735fa7df4a208dfb",
+        "93bbc15e5f81decdc48d1318aa0ba5ffb4211059"
+      ]
+    },
+    {
+      "name": "android16-6.12.23",
+      "susfs_commit": "55e16cb62127057f36a16e6a3068217ba5dade31",
+      "source_sha256": "7914ce0b0779a228c6fd8612c37596dd05a3b5ccd3d784a997431a8ff2409897",
+      "input_path": ".github/patches/android16-6.12/50_add_susfs_in_gki-android16-6.12.23.patch",
+      "input_sha256": "3e8e2300fd267f9b9391db3371936f039abb9a9cd998a0b58e0f10b1e93144d3",
+      "output_50": "android16-6.12/50_add_susfs_in_gki-android16-6.12.23.patch",
+      "output_51": "android16-6.12/51_susfs_deinlined_in_gki-android16-6.12.23.patch",
+      "baselines": [
+        "37e196381e1c7823be8c0774d15cb34855b2ee04"
+      ]
+    },
+    {
+      "name": "android16-6.12.38",
+      "susfs_commit": "55e16cb62127057f36a16e6a3068217ba5dade31",
+      "source_sha256": "7914ce0b0779a228c6fd8612c37596dd05a3b5ccd3d784a997431a8ff2409897",
+      "input_path": ".github/patches/android16-6.12/50_add_susfs_in_gki-android16-6.12.38.patch",
+      "input_sha256": "06efd419ba6a7e965446f6d21a65002d0034771aa941bd355e288e0c3d31df97",
+      "output_50": "android16-6.12/50_add_susfs_in_gki-android16-6.12.38.patch",
+      "output_51": "android16-6.12/51_susfs_deinlined_in_gki-android16-6.12.38.patch",
+      "baselines": [
+        "1b0462bd0618c9fa384498dce3d8c4476182bedf"
+      ]
+    },
+    {
+      "name": "android16-6.12.69",
+      "susfs_commit": "55e16cb62127057f36a16e6a3068217ba5dade31",
+      "source_sha256": "7914ce0b0779a228c6fd8612c37596dd05a3b5ccd3d784a997431a8ff2409897",
+      "input_path": ".github/patches/android16-6.12/50_add_susfs_in_gki-android16-6.12.69.patch",
+      "input_sha256": "03d6d6f79b6c7b1a77fded2d0fa05c9145d733bef7c4e450b8ed0b4b33340b4c",
+      "output_50": "android16-6.12/50_add_susfs_in_gki-android16-6.12.69.patch",
+      "output_51": "android16-6.12/51_susfs_deinlined_in_gki-android16-6.12.69.patch",
+      "baselines": [
+        "da20c4f35dcc3729bc90d6f516f3e9ce86964cbe"
+      ]
+    },
+    {
+      "name": "android16-6.12.81",
+      "susfs_commit": "55e16cb62127057f36a16e6a3068217ba5dade31",
+      "source_sha256": "7914ce0b0779a228c6fd8612c37596dd05a3b5ccd3d784a997431a8ff2409897",
+      "input_path": ".github/patches/android16-6.12/50_add_susfs_in_gki-android16-6.12.81.patch",
+      "input_sha256": "81c10a98b7a4de5fb935f6a15ebf8565c4063874dedcd260efc298ec5ca1dfa8",
+      "output_50": "android16-6.12/50_add_susfs_in_gki-android16-6.12.81.patch",
+      "output_51": "android16-6.12/51_susfs_deinlined_in_gki-android16-6.12.81.patch",
+      "baselines": [
+        "22e6fa8430bffa2fc3985cfdacfe122220f650fa"
+      ]
+    },
+    {
+      "name": "android16-6.12.93",
+      "susfs_commit": "55e16cb62127057f36a16e6a3068217ba5dade31",
+      "source_sha256": "7914ce0b0779a228c6fd8612c37596dd05a3b5ccd3d784a997431a8ff2409897",
+      "input_path": ".github/patches/android16-6.12/50_add_susfs_in_gki-android16-6.12.93.patch",
+      "input_sha256": "714f7de6c1b5b3b6042348f77b3064d548a3f668ee705eee83d446ef6f6bd2b2",
+      "output_50": "android16-6.12/50_add_susfs_in_gki-android16-6.12.93.patch",
+      "output_51": "android16-6.12/51_susfs_deinlined_in_gki-android16-6.12.93.patch",
+      "baselines": [
+        "57041e4a7e52342473871000827584f966d8cbd3"
+      ]
+    }
+  ]
+}
