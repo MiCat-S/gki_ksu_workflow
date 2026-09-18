@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import copy
+import difflib
 import hashlib
 import importlib.util
 import json
@@ -61,24 +62,9 @@ def directory_digest(root):
     return digest.hexdigest()
 
 
-PATCH = """diff --git a/fs/namei.c b/fs/namei.c
---- a/fs/namei.c
-+++ b/fs/namei.c
-@@ -1 +1,4 @@
- base-namei
-+filename_lookup(old_dfd, fake_filename, flags, &fake_path, NULL);
-+filename_lookup(old_dfd, fake_filename, flags, &fake_path, NULL);
-+nd->name = old_name;
-diff --git a/fs/namespace.c b/fs/namespace.c
---- a/fs/namespace.c
-+++ b/fs/namespace.c
-@@ -1 +1,3 @@
- base-namespace
-+if (mnt->mnt_id < DEFAULT_KSU_MNT_ID)
-+if (mnt->mnt_id < DEFAULT_KSU_MNT_ID)
-"""
+SOURCE = """#include <linux/security.h>
 
-SOURCE = """void susfs_update_sus_kstat(void)
+void susfs_update_sus_kstat(void)
 {
 	mutex_unlock(&susfs_mutex_lock_sus_kstat);
 	kfree(new_entry);
@@ -92,6 +78,65 @@ void susfs_spoof_cmdline_or_bootconfig(struct seq_file *m)
 	kfree(buf);
 }
 """
+
+NAMEI_BASE = "base-namei\n"
+NAMEI_APPLIED = NAMEI_BASE + """filename_lookup(old_dfd, fake_filename, flags, &fake_path, NULL);
+filename_lookup(old_dfd, fake_filename, flags, &fake_path, NULL);
+nd->name = old_name;
+"""
+NAMESPACE_BASE = "base-namespace\n"
+APPLIED_NAMESPACE = NAMESPACE_BASE + """if (mnt->mnt_id < DEFAULT_KSU_MNT_ID)
+if (mnt->mnt_id < DEFAULT_KSU_MNT_ID)
+
+static struct mount *clone_mnt(struct mount *old, struct dentry *root, int flag)
+{
+	struct mount *mnt;
+	bool is_mnt_ksu_unshared = false;
+
+	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
+		if (susfs_is_current_ksu_domain()) {
+			if (flag & CL_COPY_MNT_NS) {
+				mnt = susfs_alloc_unshare_ksu_vfsmnt(old->mnt_devname, old->mnt_id);
+				is_mnt_ksu_unshared = true;
+				goto bypass_orig_flow;
+			}
+			mnt = susfs_alloc_non_unshare_ksu_vfsmnt(old->mnt_devname);
+			goto bypass_orig_flow;
+		}
+	}
+
+	mnt = alloc_vfsmnt(old->mnt_devname);
+bypass_orig_flow:
+	if (!mnt)
+		return ERR_PTR(-ENOMEM);
+	mnt->mnt.mnt_flags = old->mnt.mnt_flags;
+	mnt->mnt.mnt_flags &= ~(MNT_WRITE_HOLD|MNT_MARKED|MNT_INTERNAL);
+	if (unlikely(is_mnt_ksu_unshared))
+		mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
+	return mnt;
+}
+
+static void cleanup_mnt(struct mount *mnt)
+{
+}
+"""
+SUSFS_BASE = "base-susfs\n"
+APPLIED_SUSFS = SUSFS_BASE + "#include <linux/security.h>\n"
+
+
+def fixture_diff(path, before, after):
+    unified = difflib.unified_diff(
+        before.splitlines(keepends=True), after.splitlines(keepends=True),
+        fromfile=f"a/{path}", tofile=f"b/{path}",
+    )
+    return f"diff --git a/{path} b/{path}\n" + "".join(unified)
+
+
+PATCH = "".join((
+    fixture_diff("fs/namei.c", NAMEI_BASE, NAMEI_APPLIED),
+    fixture_diff("fs/namespace.c", NAMESPACE_BASE, APPLIED_NAMESPACE),
+    fixture_diff("fs/susfs.c", SUSFS_BASE, APPLIED_SUSFS),
+))
 
 
 class SyncFixture:
@@ -107,8 +152,9 @@ class SyncFixture:
             self.susfs, {"kernel_patches/fs/susfs.c": SOURCE, "notes": "clean\n"})
         baseline = self.cache / self.baseline
         (baseline / "fs").mkdir(parents=True)
-        (baseline / "fs/namei.c").write_text("base-namei\n")
-        (baseline / "fs/namespace.c").write_text("base-namespace\n")
+        (baseline / "fs/namei.c").write_text(NAMEI_BASE)
+        (baseline / "fs/namespace.c").write_text(NAMESPACE_BASE)
+        (baseline / "fs/susfs.c").write_text(SUSFS_BASE)
         tools = root / "tools"
         tools.mkdir()
         self.converter = tools / "converter.sh"
@@ -198,12 +244,20 @@ class SyncTests(unittest.TestCase):
         )
         self.assertTrue(all(report["profiles"][0]["fix_coverage"].values()))
         replay = report["profiles"][0]["baselines"][0]
-        self.assertEqual((replay["offset"], replay["fuzz"]), (0, 0))
         self.assertEqual(replay["tree_kind"], "partial")
-        self.assertEqual(replay["file_count"], 2)
-        self.assertIn("result_partial_tree", replay)
-        self.assertNotIn("commit", replay)
-        self.assertNotIn("result_tree", replay)
+        self.assertEqual(replay["file_count"], 3)
+        self.assertEqual(set(replay["replays"]), {"50", "51"})
+        self.assertEqual(
+            replay["replays"]["50"]["patch_scope"], "selected-source-files")
+        self.assertEqual(
+            replay["replays"]["50"]["files"], ["fs/namespace.c"])
+        self.assertEqual(replay["replays"]["51"]["patch_scope"], "full-patch")
+        for applied in replay["replays"].values():
+            self.assertEqual((applied["offset"], applied["fuzz"]), (0, 0))
+            self.assertIn("result_partial_tree", applied)
+            self.assertTrue(all(applied["applied_source_checks"].values()))
+            self.assertNotIn("commit", applied)
+            self.assertNotIn("result_tree", applied)
         self.assertEqual(status_and_refs(self.fixture.workflow), before_workflow)
         self.assertEqual(status_and_refs(self.fixture.susfs), before_susfs)
         self.assertEqual(directory_digest(self.fixture.cache), before_cache)
@@ -370,6 +424,59 @@ class SyncTests(unittest.TestCase):
             broken = PATCH.replace(marker, "missing")
             with self.subTest(fix=name), self.assertRaises(sync.SyncError):
                 sync.validate_fix_coverage(SOURCE, PATCH, broken)
+
+    def test_applied_clone_mnt_race_regressions_are_rejected(self):
+        mutations = {
+            "missing_security_header": (APPLIED_NAMESPACE, SUSFS_BASE),
+            "incorrect_initialization": (
+                APPLIED_NAMESPACE.replace(
+                    "bool is_mnt_ksu_unshared = false;",
+                    "bool is_mnt_ksu_unshared = true;"),
+                APPLIED_SUSFS,
+            ),
+            "missing_assignment": (
+                APPLIED_NAMESPACE.replace(
+                    "\t\t\t\tis_mnt_ksu_unshared = true;\n", ""),
+                APPLIED_SUSFS,
+            ),
+            "assignment_before_allocation": (
+                APPLIED_NAMESPACE.replace(
+                    "\t\t\t\tmnt = susfs_alloc_unshare_ksu_vfsmnt(old->mnt_devname, old->mnt_id);\n"
+                    "\t\t\t\tis_mnt_ksu_unshared = true;\n",
+                    "\t\t\t\tis_mnt_ksu_unshared = true;\n"
+                    "\t\t\t\tmnt = susfs_alloc_unshare_ksu_vfsmnt(old->mnt_devname, old->mnt_id);\n"),
+                APPLIED_SUSFS,
+            ),
+            "declaration_after_allocation": (
+                APPLIED_NAMESPACE.replace(
+                    "\tbool is_mnt_ksu_unshared = false;\n", "").replace(
+                    "\t\t\t\tis_mnt_ksu_unshared = true;\n",
+                    "\t\t\t\tis_mnt_ksu_unshared = true;\n"
+                    "\t\t\t\tbool is_mnt_ksu_unshared = false;\n"),
+                APPLIED_SUSFS,
+            ),
+            "incorrect_flag_gate": (
+                APPLIED_NAMESPACE.replace(
+                    "\tif (unlikely(is_mnt_ksu_unshared))\n",
+                    "\tif (flag & CL_COPY_MNT_NS)\n"),
+                APPLIED_SUSFS,
+            ),
+            "all_markers_but_racy_static_key_recheck": (
+                APPLIED_NAMESPACE.replace(
+                    "\tif (unlikely(is_mnt_ksu_unshared))\n"
+                    "\t\tmnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;\n",
+                    "\tif (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {\n"
+                    "\t\tif (unlikely(is_mnt_ksu_unshared))\n"
+                    "\t\t\tmnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;\n"
+                    "\t}\n"),
+                APPLIED_SUSFS,
+            ),
+        }
+        sync.validate_applied_source(
+            APPLIED_NAMESPACE, APPLIED_SUSFS, "positive fixture")
+        for name, (namespace, susfs) in mutations.items():
+            with self.subTest(name=name), self.assertRaises(sync.SyncError):
+                sync.validate_applied_source(namespace, susfs, name)
 
     def test_reviewed_sync_inputs_match_the_production_stack(self):
         config_path = ROOT / ".github/config/susfs-sync.json"

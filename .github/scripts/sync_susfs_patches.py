@@ -20,6 +20,9 @@ INLINE_HOOK_RE = re.compile(r"\b(?:ksu_handle_|ksu_hook_)\w+\b")
 OFFSET_RE = re.compile(r"\b(?:offset|fuzz)\b", re.IGNORECASE)
 
 SOURCE_FIXES = {
+    "security_header": (
+        "#include <linux/security.h>",
+    ),
     "free_missing_kstat_entry": (
         "mutex_unlock(&susfs_mutex_lock_sus_kstat);\n\tkfree(new_entry);\n\tinfo.err = -ENOENT;",
     ),
@@ -119,6 +122,25 @@ def canonical_patch(data, label):
     return text
 
 
+def select_patch_files(patch_text, filenames, label):
+    wanted = {relative_path(name).as_posix() for name in filenames}
+    selected = []
+    found = set()
+    for part in re.split(r"(?=^diff --git )", patch_text, flags=re.MULTILINE):
+        match = re.match(r"^diff --git a/(\S+) b/(\S+)$", part, re.MULTILINE)
+        if not match or match.group(1) not in wanted:
+            continue
+        filename = match.group(1)
+        if match.group(2) != filename or filename in found:
+            raise SyncError(f"{label}: ambiguous patch section for {filename}")
+        selected.append(part)
+        found.add(filename)
+    missing = sorted(wanted - found)
+    if missing:
+        raise SyncError(f"{label}: missing source patch sections: {missing}")
+    return "".join(selected).encode()
+
+
 def validate_fix_coverage(source_text, patch_50, patch_51):
     coverage = {}
     for name, markers in SOURCE_FIXES.items():
@@ -136,6 +158,80 @@ def validate_fix_coverage(source_text, patch_50, patch_51):
     if hooks:
         raise SyncError(f"de-inlined patch still contains inline KSU hooks: {hooks}")
     return coverage
+
+
+def validate_applied_source(namespace_text, susfs_text, label):
+    security_headers = re.findall(
+        r"(?m)^#include <linux/security\.h>[ \t]*$", susfs_text)
+    if len(security_headers) != 1:
+        raise SyncError(f"{label}: fs/susfs.c must include linux/security.h exactly once")
+
+    starts = list(re.finditer(
+        r"(?m)^static struct mount \*clone_mnt\(", namespace_text))
+    if len(starts) != 1:
+        raise SyncError(f"{label}: expected one clone_mnt definition")
+    start = starts[0].start()
+    end_match = re.search(
+        r"(?m)^static void cleanup_mnt\(", namespace_text[starts[0].end():])
+    if not end_match:
+        raise SyncError(f"{label}: clone_mnt boundary before cleanup_mnt is missing")
+    end = starts[0].end() + end_match.start()
+    clone_mnt = namespace_text[start:end]
+
+    declaration_matches = list(re.finditer(
+        r"(?m)^[ \t]*bool is_mnt_ksu_unshared = false;[ \t]*$", clone_mnt)
+    )
+    if len(declaration_matches) != 1:
+        raise SyncError(
+            f"{label}: clone_mnt must initialize is_mnt_ksu_unshared to false")
+
+    assignments = re.findall(
+        r"(?m)^[ \t]*is_mnt_ksu_unshared[ \t]*=[^;\n]+;[ \t]*$", clone_mnt)
+    if (len(assignments) != 1 or
+            assignments[0].strip() != "is_mnt_ksu_unshared = true;"):
+        raise SyncError(
+            f"{label}: clone_mnt must record one true unshared-allocation decision")
+
+    allocation_sequence = re.compile(
+        r"(?m)^[ \t]*mnt = susfs_alloc_unshare_ksu_vfsmnt\([^;\n]+\);[ \t]*\n"
+        r"^[ \t]*is_mnt_ksu_unshared = true;[ \t]*\n"
+        r"^[ \t]*goto bypass_orig_flow;[ \t]*$")
+    allocation_matches = list(allocation_sequence.finditer(clone_mnt))
+    allocation_calls = re.findall(
+        r"(?m)^[ \t]*mnt = susfs_alloc_unshare_ksu_vfsmnt\([^;\n]+\);[ \t]*$",
+        clone_mnt)
+    if len(allocation_calls) != 1 or len(allocation_matches) != 1:
+        raise SyncError(
+            f"{label}: the true record must immediately follow the unshared allocation")
+
+    flag_sequence = re.compile(
+        r"(?m)^[ \t]*if \(unlikely\(is_mnt_ksu_unshared\)\)[ \t]*\n"
+        r"^[ \t]*mnt->mnt\.mnt_flags \|= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;[ \t]*$")
+    flag_matches = list(flag_sequence.finditer(clone_mnt))
+    flag_writes = re.findall(
+        r"(?m)^[ \t]*mnt->mnt\.mnt_flags \|= "
+        r"VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;[ \t]*$", clone_mnt)
+    if len(flag_writes) != 1 or len(flag_matches) != 1:
+        raise SyncError(
+            f"{label}: KSU_UNSHARED_MNT must be set from the recorded decision")
+
+    bypass = re.search(r"(?m)^bypass_orig_flow:[ \t]*$", clone_mnt)
+    flags_reset = clone_mnt.find("mnt->mnt.mnt_flags &=")
+    if (not bypass or flags_reset < 0 or
+            not declaration_matches[0].start() < allocation_matches[0].start() <
+            bypass.start() < flags_reset < flag_matches[0].start()):
+        raise SyncError(f"{label}: clone_mnt allocation/flag control-flow order changed")
+    after_allocation = clone_mnt[bypass.end():flag_matches[0].start()]
+    if "static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)" in after_allocation:
+        raise SyncError(
+            f"{label}: clone_mnt rechecks the static key after choosing the allocation path")
+
+    return {
+        "security_header": True,
+        "clone_mnt_false_initialization": True,
+        "clone_mnt_unshare_recording": True,
+        "clone_mnt_recorded_flag_gate": True,
+    }
 
 
 def run_converter(converter, source_patch, output_patch):
@@ -244,7 +340,8 @@ def materialize_partial_tree(files, destination):
         target.chmod(0o755 if mode == "100755" else 0o644)
 
 
-def strict_replay(patch_path, baseline_path, baseline_manifest):
+def strict_replay(patch_data, baseline_path, baseline_manifest, patch_label,
+                  susfs_source_text):
     baseline_path = Path(os.path.abspath(baseline_path))
     verified_files = verify_partial_tree(baseline_path, baseline_manifest)
     with tempfile.TemporaryDirectory(prefix="susfs-replay-") as temporary:
@@ -253,26 +350,48 @@ def strict_replay(patch_path, baseline_path, baseline_manifest):
         dry_run = run(
             ["patch", "--dry-run", "--batch", "--forward", "--fuzz=0",
              "-p1", "-d", checkout],
-            input_data=patch_path.read_bytes(), check=False,
+            input_data=patch_data, check=False,
         )
         dry_output = dry_run.stdout.decode("utf-8", errors="replace")
         if dry_run.returncode:
-            raise SyncError(f"strict patch replay failed on {baseline_path.name}\n{dry_output.strip()}")
+            raise SyncError(
+                f"{patch_label} strict patch replay failed on {baseline_path.name}\n"
+                f"{dry_output.strip()}")
         if OFFSET_RE.search(dry_output):
-            raise SyncError(f"offset or fuzz detected on {baseline_path.name}\n{dry_output.strip()}")
+            raise SyncError(
+                f"{patch_label} offset or fuzz detected on {baseline_path.name}\n"
+                f"{dry_output.strip()}")
 
         run(["git", "init", "-q", checkout])
         run(["git", "-C", checkout, "add", "-A"])
-        check = run(["git", "-C", checkout, "apply", "--check", "--verbose", patch_path])
+        check = run(
+            ["git", "-C", checkout, "apply", "--check", "--verbose", "-"],
+            input_data=patch_data)
         check_output = check.stdout.decode("utf-8", errors="replace")
         if OFFSET_RE.search(check_output):
-            raise SyncError(f"git apply reported offset or fuzz on {baseline_path.name}")
-        run(["git", "-C", checkout, "apply", "--index", patch_path])
+            raise SyncError(
+                f"{patch_label} git apply reported offset or fuzz on {baseline_path.name}\n"
+                f"{check_output.strip()}")
+        run(["git", "-C", checkout, "apply", "--index", "-"], input_data=patch_data)
+        applied_checks = validate_applied_source(
+            (checkout / "fs/namespace.c").read_text(),
+            susfs_source_text,
+            f"{patch_label} patch on {baseline_path.name}",
+        )
         tree = run(["git", "-C", checkout, "write-tree"]).stdout.decode().strip()
-        duplicate = run(["git", "-C", checkout, "apply", "--check", patch_path], check=False)
+        duplicate = run(
+            ["git", "-C", checkout, "apply", "--check", "-"],
+            input_data=patch_data, check=False)
         if duplicate.returncode == 0:
-            raise SyncError(f"duplicate patch application was accepted on {baseline_path.name}")
-        return tree
+            raise SyncError(
+                f"{patch_label} duplicate patch application was accepted on "
+                f"{baseline_path.name}")
+        return {
+            "result_partial_tree": tree,
+            "offset": 0,
+            "fuzz": 0,
+            "applied_source_checks": applied_checks,
+        }
 
 
 def ensure_output_isolated(output, inputs):
@@ -378,6 +497,8 @@ def generate(config_path, workflow_repo, susfs_repo, kernel_cache, converter, ou
             patch_51_data = target_51.read_bytes()
             patch_51 = canonical_patch(patch_51_data, f"{name} generated")
             coverage = validate_fix_coverage(source_text, patch_50, patch_51)
+            patch_50_source_data = select_patch_files(
+                patch_50, ("fs/namespace.c",), f"{name} input")
 
             baselines = []
             for baseline in profile["baselines"]:
@@ -386,16 +507,26 @@ def generate(config_path, workflow_repo, susfs_repo, kernel_cache, converter, ou
                     baseline_manifest = baseline_data["baselines"][baseline]
                 except KeyError as error:
                     raise SyncError(f"{name}: unreviewed kernel baseline key {baseline}") from error
-                tree = strict_replay(
-                    target_51, kernel_cache / baseline, baseline_manifest)
+                replays = {}
+                replay_inputs = (
+                    ("50", patch_50_source_data, "selected-source-files",
+                     ["fs/namespace.c"]),
+                    ("51", patch_51_data, "full-patch", None),
+                )
+                for patch_label, patch_data, scope, files in replay_inputs:
+                    replay = strict_replay(
+                        patch_data, kernel_cache / baseline, baseline_manifest,
+                        patch_label, source_text)
+                    replay["patch_scope"] = scope
+                    if files:
+                        replay["files"] = files
+                    replays[patch_label] = replay
                 baselines.append({
                     "cache_key": baseline,
                     "tree_kind": "partial",
                     "file_count": baseline_manifest["file_count"],
                     "manifest_sha256": baseline_manifest_hash(baseline_manifest),
-                    "result_partial_tree": tree,
-                    "offset": 0,
-                    "fuzz": 0,
+                    "replays": replays,
                 })
             report["profiles"].append({
                 "name": name,

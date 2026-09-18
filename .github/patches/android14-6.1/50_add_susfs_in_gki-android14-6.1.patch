@@ -1,13 +1,13 @@
 From: midori01 <lv@lvlv.lv>
-Date: Wed, 16 Sep 2026 07:41:14 +0900
+Date: Fri, 18 Sep 2026 07:14:38 +0900
 Subject: [PATCH] SUSFS inline hooks for gki-android14-6.1-lts
 
 ---
  drivers/input/input.c        |  10 ++
  fs/Makefile                  |   2 +
  fs/exec.c                    |  37 +++++++
- fs/namei.c                   | 240 ++++++++++++++++++++++++++++++++++++++++
- fs/namespace.c               | 254 +++++++++++++++++++++++++++++++++++++++++++
+ fs/namei.c                   | 238 ++++++++++++++++++++++++++++++++++++++++
+ fs/namespace.c               | 255 +++++++++++++++++++++++++++++++++++++++++++
  fs/notify/fdinfo.c           |  78 +++++++++++++
  fs/open.c                    |  28 +++++
  fs/proc/base.c               |  24 ++++
@@ -17,17 +17,17 @@ Subject: [PATCH] SUSFS inline hooks for gki-android14-6.1-lts
  fs/proc_namespace.c          | 178 ++++++++++++++++++++++++++++++
  fs/read_write.c              |  10 ++
  fs/readdir.c                 | 111 +++++++++++++++++++
- fs/stat.c                    |  82 ++++++++++++++
+ fs/stat.c                    |  83 +++++++++++++-
  fs/statfs.c                  |  67 ++++++++++++
  fs/super.c                   |  24 ++++
  kernel/kallsyms.c            |  31 ++++++
  kernel/reboot.c              |  12 ++
  kernel/sys.c                 |  16 +++
  mm/memory.c                  |   8 ++
- security/selinux/avc.c       |  20 ++++
+ security/selinux/avc.c       |  21 +++-
  security/selinux/hooks.c     |  45 ++++++++
  security/selinux/selinuxfs.c | 143 ++++++++++++++++++++++++
- 24 files changed, 1574 insertions(+)
+ 24 files changed, 1573 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/input/input.c b/drivers/input/input.c
 index 78be582b5766..5b548b1cf418 100644
@@ -144,7 +144,7 @@ index 6999d609d69c..23885399d734 100644
  	free_bprm(bprm);
  
 diff --git a/fs/namei.c b/fs/namei.c
-index 8e9c0b567faa..bac4700680c2 100644
+index 8e9c0b567faa..119b93fca7cd 100644
 --- a/fs/namei.c
 +++ b/fs/namei.c
 @@ -40,10 +40,21 @@
@@ -408,7 +408,7 @@ index 8e9c0b567faa..bac4700680c2 100644
  
  	nd->flags |= op->intent;
  
-@@ -3734,10 +3864,34 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
+@@ -3734,10 +3864,33 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
  		const struct open_flags *op,
  		struct file *file)
  {
@@ -416,7 +416,6 @@ index 8e9c0b567faa..bac4700680c2 100644
 +	int old_dfd = nd->dfd;
 +	bool is_nd_state_root_preset = (nd->state & ND_ROOT_PRESET);
 +	struct filename *fake_filename = NULL;
-+	struct filename *old_name = nd->name;
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  	struct user_namespace *mnt_userns;
  	struct path path;
@@ -443,7 +442,7 @@ index 8e9c0b567faa..bac4700680c2 100644
  	if (unlikely(error))
  		return error;
  	error = mnt_want_write(path.mnt);
-@@ -3752,24 +3906,62 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
+@@ -3752,24 +3905,61 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
  	mnt_drop_write(path.mnt);
  out:
  	path_put(&path);
@@ -460,7 +459,6 @@ index 8e9c0b567faa..bac4700680c2 100644
 +	int old_dfd = nd->dfd;
 +	bool is_nd_state_root_preset = (nd->state & ND_ROOT_PRESET);
 +	struct filename *fake_filename = NULL;
-+	struct filename *old_name = nd->name;
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  	struct path path;
  	int error = path_lookupat(nd, flags, &path);
@@ -506,7 +504,7 @@ index 8e9c0b567faa..bac4700680c2 100644
  	struct file *file;
  	int error;
  
-@@ -3786,10 +3978,33 @@ static struct file *path_openat(struct nameidata *nd,
+@@ -3786,10 +3976,33 @@ static struct file *path_openat(struct nameidata *nd,
  		while (!(error = link_path_walk(s, nd)) &&
  		       (s = open_last_lookups(nd, file, op)) != NULL)
  			;
@@ -540,7 +538,7 @@ index 8e9c0b567faa..bac4700680c2 100644
  	if (likely(!error)) {
  		if (likely(file->f_mode & FMODE_OPENED))
  			return file;
-@@ -5106,6 +5321,11 @@ int readlink_copy(char __user *buffer, int buflen, const char *link)
+@@ -5106,6 +5319,11 @@ int readlink_copy(char __user *buffer, int buflen, const char *link)
   *
   * Does not call security hook.
   */
@@ -552,7 +550,7 @@ index 8e9c0b567faa..bac4700680c2 100644
  int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  {
  	struct inode *inode = d_inode(dentry);
-@@ -5115,7 +5335,18 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
+@@ -5115,7 +5333,18 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  
  	if (unlikely(!(inode->i_opflags & IOP_DEFAULT_READLINK))) {
  		if (unlikely(inode->i_op->readlink))
@@ -571,7 +569,7 @@ index 8e9c0b567faa..bac4700680c2 100644
  
  		if (!d_is_symlink(dentry))
  			return -EINVAL;
-@@ -5131,6 +5362,15 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
+@@ -5131,6 +5360,15 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  		if (IS_ERR(link))
  			return PTR_ERR(link);
  	}
@@ -588,10 +586,10 @@ index 8e9c0b567faa..bac4700680c2 100644
  	do_delayed_call(&done);
  	return res;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 4d910be7cc9a..4517af1cd40a 100644
+index 4d910be7cc9a..572d3c20f9fc 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
-@@ -32,11 +32,20 @@
+@@ -32,11 +32,21 @@
  #include <linux/fs_context.h>
  #include <linux/shmem_fs.h>
  #include <linux/mnt_idmapping.h>
@@ -606,13 +604,14 @@ index 4d910be7cc9a..4517af1cd40a 100644
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +extern bool susfs_is_current_ksu_domain(void);
 +extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
++
 +#define CL_COPY_MNT_NS BIT(25) /* used by copy_mnt_ns() */
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
  /* Maximum number of mounts in a mount namespace */
  static unsigned int sysctl_mount_max __read_mostly = 100000;
  
-@@ -145,6 +154,10 @@ static int mnt_alloc_id(struct mount *mnt)
+@@ -145,6 +155,10 @@ static int mnt_alloc_id(struct mount *mnt)
  
  static void mnt_free_id(struct mount *mnt)
  {
@@ -623,7 +622,7 @@ index 4d910be7cc9a..4517af1cd40a 100644
  	ida_free(&mnt_id_ida, mnt->mnt_id);
  }
  
-@@ -153,7 +166,25 @@ static void mnt_free_id(struct mount *mnt)
+@@ -153,7 +167,25 @@ static void mnt_free_id(struct mount *mnt)
   */
  static int mnt_alloc_group_id(struct mount *mnt)
  {
@@ -649,7 +648,7 @@ index 4d910be7cc9a..4517af1cd40a 100644
  
  	if (res < 0)
  		return res;
-@@ -203,6 +234,119 @@ int mnt_get_count(struct mount *mnt)
+@@ -203,6 +235,119 @@ int mnt_get_count(struct mount *mnt)
  #endif
  }
  
@@ -769,7 +768,7 @@ index 4d910be7cc9a..4517af1cd40a 100644
  static struct mount *alloc_vfsmnt(const char *name)
  {
  	struct mount *mnt = kmem_cache_zalloc(mnt_cache, GFP_KERNEL);
-@@ -676,6 +820,20 @@ struct mount *__lookup_mnt(struct vfsmount *mnt, struct dentry *dentry)
+@@ -676,6 +821,20 @@ struct mount *__lookup_mnt(struct vfsmount *mnt, struct dentry *dentry)
  	struct hlist_head *head = m_hash(mnt, dentry);
  	struct mount *p;
  
@@ -790,7 +789,7 @@ index 4d910be7cc9a..4517af1cd40a 100644
  	hlist_for_each_entry_rcu(p, head, mnt_hash)
  		if (&p->mnt_parent->mnt == mnt && p->mnt_mountpoint == dentry)
  			return p;
-@@ -1020,7 +1178,21 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
+@@ -1020,7 +1179,21 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
  	if (!fc->root)
  		return ERR_PTR(-EINVAL);
  
@@ -812,11 +811,13 @@ index 4d910be7cc9a..4517af1cd40a 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1107,7 +1279,39 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1106,8 +1279,42 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+ 	struct super_block *sb = old->mnt.mnt_sb;
  	struct mount *mnt;
  	int err;
- 
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++	bool is_mnt_ksu_unshared = false;
++
 +	// - We will just stop checking for ksu process if /sdcard/Android is accessible,
 +	//   for the sake of performance
 +	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
@@ -829,6 +830,7 @@ index 4d910be7cc9a..4517af1cd40a 100644
 +			//   mnt->mnt_id is assigned without ida when it is being freed in mnt_free_id().
 +			if (flag & CL_COPY_MNT_NS) {
 +				mnt = susfs_alloc_unshare_ksu_vfsmnt(old->mnt_devname, old->mnt_id);
++				is_mnt_ksu_unshared = true;
 +				goto bypass_orig_flow;
 +			}
 +			// else we just go assign fake mnt_id starting with DEFAULT_KSU_MNT_ID
@@ -844,7 +846,7 @@ index 4d910be7cc9a..4517af1cd40a 100644
 +		goto bypass_orig_flow;
 +	}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+
+ 
  	mnt = alloc_vfsmnt(old->mnt_devname);
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +bypass_orig_flow:
@@ -852,21 +854,19 @@ index 4d910be7cc9a..4517af1cd40a 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1125,6 +1329,13 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1125,6 +1332,11 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
  	mnt->mnt.mnt_flags = old->mnt.mnt_flags;
  	mnt->mnt.mnt_flags &= ~(MNT_WRITE_HOLD|MNT_MARKED|MNT_INTERNAL);
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
-+		if (susfs_is_current_ksu_domain() && (flag & CL_COPY_MNT_NS))
-+			mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
-+	}
++	if (unlikely(is_mnt_ksu_unshared))
++		mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
  	atomic_inc(&sb->s_active);
  	mnt->mnt.mnt_userns = mnt_user_ns(&old->mnt);
  	if (!initial_idmapping(mnt->mnt.mnt_userns))
-@@ -3518,6 +3729,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+@@ -3518,6 +3730,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
  	copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;
  	if (user_ns != ns->user_ns)
  		copy_flags |= CL_SHARED_TO_SLAVE;
@@ -876,7 +876,7 @@ index 4d910be7cc9a..4517af1cd40a 100644
  	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
  	if (IS_ERR(new)) {
  		namespace_unlock();
-@@ -4765,3 +4979,43 @@ static int __init init_fs_namespace_sysctls(void)
+@@ -4765,3 +4980,43 @@ static int __init init_fs_namespace_sysctls(void)
  fs_initcall(init_fs_namespace_sysctls);
  
  #endif /* CONFIG_SYSCTL */
@@ -1924,7 +1924,7 @@ index 9c53edb60c03..70c4fbcc46b2 100644
  	if (error >= 0)
  		error = buf.error;
 diff --git a/fs/stat.c b/fs/stat.c
-index ef50573c72a2..5338f41d4bac 100644
+index ef50573c72a2..60b31f5e40c5 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -19,12 +19,27 @@
@@ -1955,7 +1955,7 @@ index ef50573c72a2..5338f41d4bac 100644
  /**
   * generic_fillattr - Fill in the basic attributes from the inode struct
   * @mnt_userns:	user namespace of the mount the inode was found from
-@@ -120,9 +135,51 @@ int vfs_getattr_nosec(const struct path *path, struct kstat *stat,
+@@ -120,10 +135,51 @@ int vfs_getattr_nosec(const struct path *path, struct kstat *stat,
  				  STATX_ATTR_DAX);
  
  	mnt_userns = mnt_user_ns(path->mnt);
@@ -2003,11 +2003,12 @@ index ef50573c72a2..5338f41d4bac 100644
 +#else
  		return inode->i_op->getattr(mnt_userns, path, stat,
  					    request_mask, query_flags);
+-
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
- 
  	generic_fillattr(mnt_userns, inode, stat);
  	return 0;
-@@ -181,6 +238,10 @@ int vfs_fstat(int fd, struct kstat *stat)
+ }
+@@ -181,6 +237,10 @@ int vfs_fstat(int fd, struct kstat *stat)
  	if (!f.file)
  		return -EBADF;
  	error = vfs_getattr(&f.file->f_path, stat, STATX_BASIC_STATS, 0);
@@ -2018,7 +2019,7 @@ index ef50573c72a2..5338f41d4bac 100644
  	fdput(f);
  	return error;
  }
-@@ -221,6 +282,18 @@ static int vfs_statx(int dfd, struct filename *filename, int flags,
+@@ -221,6 +281,18 @@ static int vfs_statx(int dfd, struct filename *filename, int flags,
  	unsigned int lookup_flags = getname_statx_lookup_flags(flags);
  	int error;
  
@@ -2037,7 +2038,7 @@ index ef50573c72a2..5338f41d4bac 100644
  	if (flags & ~(AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT | AT_EMPTY_PATH |
  		      AT_STATX_SYNC_TYPE))
  		return -EINVAL;
-@@ -232,7 +305,16 @@ static int vfs_statx(int dfd, struct filename *filename, int flags,
+@@ -232,7 +304,16 @@ static int vfs_statx(int dfd, struct filename *filename, int flags,
  
  	error = vfs_getattr(&path, stat, request_mask, flags);
  
@@ -2149,10 +2150,10 @@ index 96d1c3edf289..37379f61a904 100644
  	if (!error)
  		buf->f_flags = calculate_f_flags(path->mnt);
 diff --git a/fs/super.c b/fs/super.c
-index a50cc4fdc523..1a105fab92eb 100644
+index a50cc4fdc523..a4e1d3db114e 100644
 --- a/fs/super.c
 +++ b/fs/super.c
-@@ -37,11 +37,19 @@
+@@ -37,6 +37,9 @@
  #include <linux/lockdep.h>
  #include <linux/user_namespace.h>
  #include <linux/fs_context.h>
@@ -2162,16 +2163,18 @@ index a50cc4fdc523..1a105fab92eb 100644
  #include <uapi/linux/mount.h>
  #include "internal.h"
  
- #include <trace/hooks/fs.h>
+@@ -1084,6 +1087,11 @@ void emergency_thaw_all(void)
+ 
+ static DEFINE_IDA(unnamed_dev_ida);
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +extern bool susfs_is_current_ksu_domain(void);
 +extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
- static int thaw_super_locked(struct super_block *sb);
- 
- static LIST_HEAD(super_blocks);
+ /**
+  * get_anon_bdev - Allocate a block device for filesystems which don't have one.
+  * @p: Pointer to a dev_t.
 @@ -1099,6 +1107,22 @@ int get_anon_bdev(dev_t *p)
  {
  	int dev;
@@ -2350,7 +2353,7 @@ index c17bdc64e12c..584a3a426c0d 100644
  				gup_flags, &page, &vma, NULL);
  		if (ret <= 0) {
 diff --git a/security/selinux/avc.c b/security/selinux/avc.c
-index d93af92498f5..d5396a9f8bab 100644
+index d93af92498f5..0e31fe21ec72 100644
 --- a/security/selinux/avc.c
 +++ b/security/selinux/avc.c
 @@ -47,6 +47,12 @@
@@ -2366,7 +2369,7 @@ index d93af92498f5..d5396a9f8bab 100644
  struct avc_entry {
  	u32			ssid;
  	u32			tsid;
-@@ -732,11 +738,25 @@ static void avc_audit_post_callback(struct audit_buffer *ab, void *a)
+@@ -732,11 +738,24 @@ static void avc_audit_post_callback(struct audit_buffer *ab, void *a)
  
  	rc = security_sid_to_context(sad->state, sad->tsid, &tcontext,
  				     &tcontext_len);
@@ -2385,7 +2388,7 @@ index d93af92498f5..d5396a9f8bab 100644
  		audit_log_format(ab, " tsid=%d", sad->tsid);
  	else
  		audit_log_format(ab, " tcontext=%s", tcontext);
- 
+-
 +#ifdef CONFIG_KSU_SUSFS
 +bypass_orig_flow:
 +#endif
@@ -2661,3 +2664,6 @@ index 755325a94a86..396cafeb3db5 100644
  static ssize_t sel_write_create(struct file *file, char *buf, size_t size)
  {
  	struct selinux_fs_info *fsi = file_inode(file)->i_sb->s_fs_info;
+
+-- 
+2.55.0

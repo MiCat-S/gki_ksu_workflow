@@ -33,13 +33,25 @@ import hashlib
 # This converter is only for the reviewed inputs. Production applies the checked-in
 # generated patches; admitting a new input requires reviewing the generated diff.
 REVIEWED_INPUTS = {
-    "da937599a09b383a03b672a49a07ece986ee8283b12c08089ec009c827e83d3e",
-    "37c83bc24585077a272d4375589ea39e3994614695a7458e5596c45ce6c3326a",
-    "3e8e2300fd267f9b9391db3371936f039abb9a9cd998a0b58e0f10b1e93144d3",
-    "06efd419ba6a7e965446f6d21a65002d0034771aa941bd355e288e0c3d31df97",
-    "03d6d6f79b6c7b1a77fded2d0fa05c9145d733bef7c4e450b8ed0b4b33340b4c",
-    "81c10a98b7a4de5fb935f6a15ebf8565c4063874dedcd260efc298ec5ca1dfa8",
-    "714f7de6c1b5b3b6042348f77b3064d548a3f668ee705eee83d446ef6f6bd2b2",
+    "8daf1a59ae7fe9926967923a1a97a27f509c2e98eeb95cf7af206e2af0a2f04e",
+    "2a2b261a4bba5602edb1bc1c05a3e9aef1fb830ab123a9f41d2a92d4b4180bb7",
+    "30b8d6c89bba03dfc313b2a3eb8cdf9108f24334e8f18b1883a4c603444ee898",
+    "f9b745cb8585e82ea42c46c5d9afb003bcf5996583c993baac99edfa50dc5306",
+    "010885363f9376c3abdf8e10af7fa8e75e1e586c4362cb03dddbf0c0aea1ec56",
+    "2987aefe9f72285b6a566f802bbcb8fc2bd04e7923d18d439225d031443dd373",
+    "a2f977484af4e59de0b3e32d57a2bab4f5144a775e4ea6e4543230f8ce39340b",
+}
+
+# This reviewed 6.12.23 input retained a hunk coordinate from a newer baseline.
+# Its context is exact on the pinned source; normalize only that known header so
+# the generated production patch remains zero-offset on the frozen baseline.
+REVIEWED_HUNK_REWRITES = {
+    "30b8d6c89bba03dfc313b2a3eb8cdf9108f24334e8f18b1883a4c603444ee898": (
+        (
+            "@@ -6835,8 +6838,18 @@ static int __access_remote_vm(struct mm_struct *mm, unsigned long addr,",
+            "@@ -6827,8 +6830,18 @@ static int __access_remote_vm(struct mm_struct *mm, unsigned long addr,",
+        ),
+    ),
 }
 
 def print_script_header_banner(script_path):
@@ -413,6 +425,7 @@ def main():
     print_script_header_banner(script_file)
 
     content = read_patch(input_file)
+    input_digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
     file_patches = split_patch(content)
 
     if not file_patches:
@@ -458,9 +471,14 @@ def main():
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
 
+    output = "\n".join(processed) + "\n"
+    for old, new in REVIEWED_HUNK_REWRITES.get(input_digest, ()):
+        if output.count(old) != 1:
+            raise ValueError(f"Reviewed hunk coordinate changed: {old}")
+        output = output.replace(old, new, 1)
+
     with open(output_file, "w", encoding="utf-8") as f:
-        f.write("\n".join(processed))
-        f.write("\n")
+        f.write(output)
 
     print("\nSummary:")
     total_orig_hunks = sum(info["orig_hunks"] for _, info in results)

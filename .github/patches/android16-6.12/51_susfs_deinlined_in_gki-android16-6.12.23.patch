@@ -12,7 +12,7 @@ index 9f5d06f4a1a1..eeea6b70b47a 100644
  obj-$(CONFIG_PROC_FS)		+= proc_namespace.o
  obj-$(CONFIG_LEGACY_DIRECT_IO)	+= direct-io.o
 diff --git a/fs/namei.c b/fs/namei.c
-index ce03b3d91a62..eb3866f851ef 100644
+index ce03b3d91a62..1afba5fdf949 100644
 --- a/fs/namei.c
 +++ b/fs/namei.c
 @@ -40,10 +40,21 @@
@@ -275,7 +275,7 @@ index ce03b3d91a62..eb3866f851ef 100644
  
  	nd->flags |= op->intent;
  
-@@ -3879,9 +4008,33 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
+@@ -3879,9 +4008,32 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
  		const struct open_flags *op,
  		struct file *file)
  {
@@ -283,7 +283,6 @@ index ce03b3d91a62..eb3866f851ef 100644
 +	int old_dfd = nd->dfd;
 +	bool is_nd_state_root_preset = (nd->state & ND_ROOT_PRESET);
 +	struct filename *fake_filename = NULL;
-+	struct filename *old_name = nd->name;
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  	struct path path;
  	int error = path_lookupat(nd, flags | LOOKUP_DIRECTORY, &path);
@@ -309,7 +308,7 @@ index ce03b3d91a62..eb3866f851ef 100644
  	if (unlikely(error))
  		return error;
  	error = mnt_want_write(path.mnt);
-@@ -3895,24 +4048,62 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
+@@ -3895,24 +4047,61 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
  	mnt_drop_write(path.mnt);
  out:
  	path_put(&path);
@@ -326,7 +325,6 @@ index ce03b3d91a62..eb3866f851ef 100644
 +	int old_dfd = nd->dfd;
 +	bool is_nd_state_root_preset = (nd->state & ND_ROOT_PRESET);
 +	struct filename *fake_filename = NULL;
-+	struct filename *old_name = nd->name;
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  	struct path path;
  	int error = path_lookupat(nd, flags, &path);
@@ -372,7 +370,7 @@ index ce03b3d91a62..eb3866f851ef 100644
  	struct file *file;
  	int error;
  
-@@ -3929,10 +4120,33 @@ static struct file *path_openat(struct nameidata *nd,
+@@ -3929,10 +4118,33 @@ static struct file *path_openat(struct nameidata *nd,
  		while (!(error = link_path_walk(s, nd)) &&
  		       (s = open_last_lookups(nd, file, op)) != NULL)
  			;
@@ -406,7 +404,7 @@ index ce03b3d91a62..eb3866f851ef 100644
  	if (likely(!error)) {
  		if (likely(file->f_mode & FMODE_OPENED))
  			return file;
-@@ -5243,6 +5457,11 @@ int readlink_copy(char __user *buffer, int buflen, const char *link)
+@@ -5243,6 +5455,11 @@ int readlink_copy(char __user *buffer, int buflen, const char *link)
   *
   * Does not call security hook.
   */
@@ -418,7 +416,7 @@ index ce03b3d91a62..eb3866f851ef 100644
  int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  {
  	struct inode *inode = d_inode(dentry);
-@@ -5252,7 +5471,18 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
+@@ -5252,7 +5469,18 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  
  	if (unlikely(!(inode->i_opflags & IOP_DEFAULT_READLINK))) {
  		if (unlikely(inode->i_op->readlink))
@@ -437,7 +435,7 @@ index ce03b3d91a62..eb3866f851ef 100644
  
  		if (!d_is_symlink(dentry))
  			return -EINVAL;
-@@ -5268,6 +5498,15 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
+@@ -5268,6 +5496,15 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  		if (IS_ERR(link))
  			return PTR_ERR(link);
  	}
@@ -454,7 +452,7 @@ index ce03b3d91a62..eb3866f851ef 100644
  	do_delayed_call(&done);
  	return res;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 100f5e7bc0e7..5ca67b45ad5d 100644
+index 100f5e7bc0e7..eaefbed0ee5f 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -33,11 +33,21 @@
@@ -701,11 +699,13 @@ index 100f5e7bc0e7..5ca67b45ad5d 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1290,7 +1478,39 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1289,8 +1477,42 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+ 	struct super_block *sb = old->mnt.mnt_sb;
  	struct mount *mnt;
  	int err;
- 
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++	bool is_mnt_ksu_unshared = false;
++
 +	// - We will just stop checking for ksu process if /sdcard/Android is accessible,
 +	//   for the sake of performance
 +	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
@@ -718,6 +718,7 @@ index 100f5e7bc0e7..5ca67b45ad5d 100644
 +			//   mnt->mnt_id is assigned without ida when it is being freed in mnt_free_id().
 +			if (flag & CL_COPY_MNT_NS) {
 +				mnt = susfs_alloc_unshare_ksu_vfsmnt(old->mnt_devname, old->mnt_id);
++				is_mnt_ksu_unshared = true;
 +				goto bypass_orig_flow;
 +			}
 +			// else we just go assign fake mnt_id starting with DEFAULT_KSU_MNT_ID
@@ -733,7 +734,7 @@ index 100f5e7bc0e7..5ca67b45ad5d 100644
 +		goto bypass_orig_flow;
 +	}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+
+ 
  	mnt = alloc_vfsmnt(old->mnt_devname);
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +bypass_orig_flow:
@@ -741,15 +742,13 @@ index 100f5e7bc0e7..5ca67b45ad5d 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1308,6 +1528,13 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1308,6 +1530,11 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
  	mnt->mnt.mnt_flags = old->mnt.mnt_flags;
  	mnt->mnt.mnt_flags &= ~(MNT_WRITE_HOLD|MNT_MARKED|MNT_INTERNAL);
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
-+		if (susfs_is_current_ksu_domain() && (flag & CL_COPY_MNT_NS))
-+			mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
-+	}
++	if (unlikely(is_mnt_ksu_unshared))
++		mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
  	atomic_inc(&sb->s_active);
@@ -1152,7 +1151,7 @@ index 5e391cbca7a3..b6d2e1628396 100644
  	show_fd_locks(m, file, files);
  	if (seq_has_overflowed(m))
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-index 41c179ff550c..6172d0e9e3b6 100644
+index 41c179ff550c..5f38c185f770 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -26,6 +26,9 @@
@@ -1180,10 +1179,11 @@ index 41c179ff550c..6172d0e9e3b6 100644
  static void
  show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
  {
-@@ -465,10 +476,42 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
+@@ -465,10 +476,41 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
  
  	if (vma->vm_file) {
  		const struct inode *inode = file_user_inode(vma->vm_file);
+-
 +#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 +		if (SUSFS_IS_INODE_OPEN_REDIRECT(inode)) {
 +			char *spoofed_redirected_name = NULL;
@@ -1213,7 +1213,6 @@ index 41c179ff550c..6172d0e9e3b6 100644
 +		if (SUSFS_IS_INODE_SUS_MAP(inode))
 +			return;
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
- 
  		dev = inode->i_sb->s_dev;
  		ino = inode->i_ino;
  		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
@@ -1223,7 +1222,7 @@ index 41c179ff550c..6172d0e9e3b6 100644
  	}
  
  	start = vma->vm_start;
-@@ -1304,6 +1347,13 @@ static int show_smap(struct seq_file *m, void *v)
+@@ -1304,6 +1346,13 @@ static int show_smap(struct seq_file *m, void *v)
  	struct vm_area_struct *vma = v;
  	struct mem_size_stats mss = {};
  
@@ -1237,7 +1236,7 @@ index 41c179ff550c..6172d0e9e3b6 100644
  	if (!vma_pages(vma))
  		goto show_pad;
  
-@@ -1363,7 +1413,14 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
+@@ -1363,7 +1412,14 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
  
  	vma_start = vma->vm_start;
  	do {
@@ -1252,7 +1251,7 @@ index 41c179ff550c..6172d0e9e3b6 100644
  		last_vma_end = vma->vm_end;
  
  		/*
-@@ -1429,8 +1486,15 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
+@@ -1429,8 +1485,15 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
  
  			/* Case 4 above */
  			if (vma->vm_end > last_vma_end) {
@@ -1268,7 +1267,7 @@ index 41c179ff550c..6172d0e9e3b6 100644
  			}
  		}
  	} for_each_vma(vmi, vma);
-@@ -2221,6 +2285,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+@@ -2221,6 +2284,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  	while (count && (start_vaddr < end_vaddr)) {
  		int len;
  		unsigned long end;
@@ -1278,7 +1277,7 @@ index 41c179ff550c..6172d0e9e3b6 100644
  
  		pm.pos = 0;
  		end = (start_vaddr + PAGEMAP_WALK_SIZE) & PAGEMAP_WALK_MASK;
-@@ -2230,7 +2297,15 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+@@ -2230,7 +2296,15 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  		ret = mmap_read_lock_killable(mm);
  		if (ret)
  			goto out_free;
@@ -1990,10 +1989,10 @@ index 83c5d3febbb8..6975513ebc36 100644
  	if (!error)
  		buf->f_flags = calculate_f_flags(path->mnt);
 diff --git a/fs/super.c b/fs/super.c
-index 6a8a1b67a35a..cecc61130f5d 100644
+index 6a8a1b67a35a..7f8e67d9a8d4 100644
 --- a/fs/super.c
 +++ b/fs/super.c
-@@ -37,9 +37,17 @@
+@@ -37,6 +37,9 @@
  #include <linux/lockdep.h>
  #include <linux/user_namespace.h>
  #include <linux/fs_context.h>
@@ -2003,14 +2002,18 @@ index 6a8a1b67a35a..cecc61130f5d 100644
  #include <uapi/linux/mount.h>
  #include "internal.h"
  
+@@ -1191,6 +1194,11 @@ void emergency_thaw_all(void)
+ 
+ static DEFINE_IDA(unnamed_dev_ida);
+ 
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +extern bool susfs_is_current_ksu_domain(void);
 +extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
- static int thaw_super_locked(struct super_block *sb, enum freeze_holder who);
- 
- static LIST_HEAD(super_blocks);
+ /**
+  * get_anon_bdev - Allocate a block device for filesystems which don't have one.
+  * @p: Pointer to a dev_t.
 @@ -1206,6 +1214,22 @@ int get_anon_bdev(dev_t *p)
  {
  	int dev;
@@ -2111,7 +2114,7 @@ index 4a87dc5fa867..811b1afa2310 100644
  	if (copy_to_user(name, &tmp, sizeof(tmp)))
  		return -EFAULT;
 diff --git a/mm/memory.c b/mm/memory.c
-index 353e4e8ae1c6..9a9419a2ea00 100644
+index 29c0801608de..983d70d4bded 100644
 --- a/mm/memory.c
 +++ b/mm/memory.c
 @@ -79,6 +79,9 @@

@@ -1,19 +1,19 @@
 From: midori01 <lv@lvlv.lv>
-Date: Wed, 16 Sep 2026 07:41:14 +0900
+Date: Fri, 18 Sep 2026 07:15:13 +0900
 Subject: [PATCH] SUSFS inline hooks for gki-android16-6.12-2026-03
 
 ---
  drivers/input/input.c          |  10 ++
  fs/Makefile                    |   2 +
- fs/exec.c                      |  37 +++++
- fs/namei.c                     | 239 +++++++++++++++++++++++++++++++++
+ fs/exec.c                      |  38 ++++++
+ fs/namei.c                     | 237 ++++++++++++++++++++++++++++++++
  fs/namespace.c                 | 297 +++++++++++++++++++++++++++++++++++++++++
  fs/notify/fdinfo.c             |  78 +++++++++++
  fs/open.c                      |  28 ++++
  fs/proc/base.c                 |  24 ++++
  fs/proc/bootconfig.c           |  13 ++
  fs/proc/fd.c                   |  70 ++++++++++
- fs/proc/task_mmu.c             |  75 +++++++++++
+ fs/proc/task_mmu.c             |  77 ++++++++++-
  fs/proc_namespace.c            | 174 ++++++++++++++++++++++++
  fs/read_write.c                |  10 ++
  fs/readdir.c                   | 126 +++++++++++++++++
@@ -24,11 +24,11 @@ Subject: [PATCH] SUSFS inline hooks for gki-android16-6.12-2026-03
  kernel/reboot.c                |  12 ++
  kernel/sys.c                   |  15 +++
  mm/memory.c                    |  13 ++
- security/selinux/avc.c         |  20 +++
+ security/selinux/avc.c         |  21 ++-
  security/selinux/hooks.c       |  45 +++++++
  security/selinux/selinuxfs.c   | 147 ++++++++++++++++++++
  security/selinux/ss/services.c |  24 ++++
- 25 files changed, 1670 insertions(+)
+ 25 files changed, 1670 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/input/input.c b/drivers/input/input.c
 index 372c9df9051f..66d671b769fb 100644
@@ -72,20 +72,21 @@ index 9f5d06f4a1a1..eeea6b70b47a 100644
  obj-$(CONFIG_PROC_FS)		+= proc_namespace.o
  obj-$(CONFIG_LEGACY_DIRECT_IO)	+= direct-io.o
 diff --git a/fs/exec.c b/fs/exec.c
-index 965fdc593d65..9511723d2fae 100644
+index 965fdc593d65..b05d0e079727 100644
 --- a/fs/exec.c
 +++ b/fs/exec.c
-@@ -70,6 +70,9 @@
+@@ -70,6 +70,10 @@
  #include <linux/rseq.h>
  #include <linux/ksm.h>
  #include <linux/dma-buf.h>
 +#ifdef CONFIG_KSU_SUSFS
 +#include <linux/susfs_def.h>
 +#endif
++
  
  #include <linux/uaccess.h>
  #include <asm/mmu_context.h>
-@@ -1932,6 +1935,18 @@ static int bprm_execve(struct linux_binprm *bprm)
+@@ -1932,6 +1936,18 @@ static int bprm_execve(struct linux_binprm *bprm)
  	return retval;
  }
  
@@ -104,7 +105,7 @@ index 965fdc593d65..9511723d2fae 100644
  static int do_execveat_common(int fd, struct filename *filename,
  			      struct user_arg_ptr argv,
  			      struct user_arg_ptr envp,
-@@ -1939,10 +1954,28 @@ static int do_execveat_common(int fd, struct filename *filename,
+@@ -1939,10 +1955,28 @@ static int do_execveat_common(int fd, struct filename *filename,
  {
  	struct linux_binprm *bprm;
  	int retval;
@@ -133,7 +134,7 @@ index 965fdc593d65..9511723d2fae 100644
  	/*
  	 * We move the actual failure in case of RLIMIT_NPROC excess from
  	 * set*uid() to execve() because too many poorly written programs
-@@ -2009,6 +2042,10 @@ static int do_execveat_common(int fd, struct filename *filename,
+@@ -2009,6 +2043,10 @@ static int do_execveat_common(int fd, struct filename *filename,
  	}
  
  	retval = bprm_execve(bprm);
@@ -145,7 +146,7 @@ index 965fdc593d65..9511723d2fae 100644
  	free_bprm(bprm);
  
 diff --git a/fs/namei.c b/fs/namei.c
-index bdc243fc4e03..ea92a25cf657 100644
+index bdc243fc4e03..665c974adc86 100644
 --- a/fs/namei.c
 +++ b/fs/namei.c
 @@ -40,10 +40,21 @@
@@ -408,7 +409,7 @@ index bdc243fc4e03..ea92a25cf657 100644
  
  	nd->flags |= op->intent;
  
-@@ -3887,9 +4016,33 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
+@@ -3887,9 +4016,32 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
  		const struct open_flags *op,
  		struct file *file)
  {
@@ -416,7 +417,6 @@ index bdc243fc4e03..ea92a25cf657 100644
 +	int old_dfd = nd->dfd;
 +	bool is_nd_state_root_preset = (nd->state & ND_ROOT_PRESET);
 +	struct filename *fake_filename = NULL;
-+	struct filename *old_name = nd->name;
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  	struct path path;
  	int error = path_lookupat(nd, flags | LOOKUP_DIRECTORY, &path);
@@ -442,7 +442,7 @@ index bdc243fc4e03..ea92a25cf657 100644
  	if (unlikely(error))
  		return error;
  	error = mnt_want_write(path.mnt);
-@@ -3903,24 +4056,62 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
+@@ -3903,24 +4055,61 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
  	mnt_drop_write(path.mnt);
  out:
  	path_put(&path);
@@ -459,7 +459,6 @@ index bdc243fc4e03..ea92a25cf657 100644
 +	int old_dfd = nd->dfd;
 +	bool is_nd_state_root_preset = (nd->state & ND_ROOT_PRESET);
 +	struct filename *fake_filename = NULL;
-+	struct filename *old_name = nd->name;
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  	struct path path;
  	int error = path_lookupat(nd, flags, &path);
@@ -505,7 +504,7 @@ index bdc243fc4e03..ea92a25cf657 100644
  	struct file *file;
  	int error;
  
-@@ -3937,10 +4128,33 @@ static struct file *path_openat(struct nameidata *nd,
+@@ -3937,10 +4126,33 @@ static struct file *path_openat(struct nameidata *nd,
  		while (!(error = link_path_walk(s, nd)) &&
  		       (s = open_last_lookups(nd, file, op)) != NULL)
  			;
@@ -539,7 +538,7 @@ index bdc243fc4e03..ea92a25cf657 100644
  	if (likely(!error)) {
  		if (likely(file->f_mode & FMODE_OPENED))
  			return file;
-@@ -5251,6 +5465,11 @@ int readlink_copy(char __user *buffer, int buflen, const char *link)
+@@ -5251,6 +5463,11 @@ int readlink_copy(char __user *buffer, int buflen, const char *link)
   *
   * Does not call security hook.
   */
@@ -551,7 +550,7 @@ index bdc243fc4e03..ea92a25cf657 100644
  int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  {
  	struct inode *inode = d_inode(dentry);
-@@ -5260,7 +5479,18 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
+@@ -5260,7 +5477,18 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  
  	if (unlikely(!(inode->i_opflags & IOP_DEFAULT_READLINK))) {
  		if (unlikely(inode->i_op->readlink))
@@ -570,7 +569,7 @@ index bdc243fc4e03..ea92a25cf657 100644
  
  		if (!d_is_symlink(dentry))
  			return -EINVAL;
-@@ -5276,6 +5506,15 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
+@@ -5276,6 +5504,15 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  		if (IS_ERR(link))
  			return PTR_ERR(link);
  	}
@@ -587,7 +586,7 @@ index bdc243fc4e03..ea92a25cf657 100644
  	do_delayed_call(&done);
  	return res;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 3e9b092e018d..a35e25fc55ac 100644
+index 3e9b092e018d..6f3159519be8 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -33,11 +33,21 @@
@@ -834,11 +833,13 @@ index 3e9b092e018d..a35e25fc55ac 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1296,7 +1484,39 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1295,8 +1483,42 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+ 	struct super_block *sb = old->mnt.mnt_sb;
  	struct mount *mnt;
  	int err;
- 
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++	bool is_mnt_ksu_unshared = false;
++
 +	// - We will just stop checking for ksu process if /sdcard/Android is accessible,
 +	//   for the sake of performance
 +	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
@@ -851,6 +852,7 @@ index 3e9b092e018d..a35e25fc55ac 100644
 +			//   mnt->mnt_id is assigned without ida when it is being freed in mnt_free_id().
 +			if (flag & CL_COPY_MNT_NS) {
 +				mnt = susfs_alloc_unshare_ksu_vfsmnt(old->mnt_devname, old->mnt_id);
++				is_mnt_ksu_unshared = true;
 +				goto bypass_orig_flow;
 +			}
 +			// else we just go assign fake mnt_id starting with DEFAULT_KSU_MNT_ID
@@ -866,7 +868,7 @@ index 3e9b092e018d..a35e25fc55ac 100644
 +		goto bypass_orig_flow;
 +	}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+
+ 
  	mnt = alloc_vfsmnt(old->mnt_devname);
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +bypass_orig_flow:
@@ -874,15 +876,13 @@ index 3e9b092e018d..a35e25fc55ac 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1314,6 +1534,13 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1314,6 +1536,11 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
  	mnt->mnt.mnt_flags = old->mnt.mnt_flags;
  	mnt->mnt.mnt_flags &= ~(MNT_WRITE_HOLD|MNT_MARKED|MNT_INTERNAL);
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
-+		if (susfs_is_current_ksu_domain() && (flag & CL_COPY_MNT_NS))
-+			mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
-+	}
++	if (unlikely(is_mnt_ksu_unshared))
++		mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
  	atomic_inc(&sb->s_active);
@@ -1346,7 +1346,7 @@ index 5e391cbca7a3..b6d2e1628396 100644
  	show_fd_locks(m, file, files);
  	if (seq_has_overflowed(m))
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-index 7294b14811bc..b15b8a0cb618 100644
+index 7294b14811bc..864b6024a9d8 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -27,6 +27,9 @@
@@ -1374,10 +1374,11 @@ index 7294b14811bc..b15b8a0cb618 100644
  static void
  show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
  {
-@@ -468,10 +479,42 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
+@@ -468,10 +479,41 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
  
  	if (vma->vm_file) {
  		const struct inode *inode = file_user_inode(vma->vm_file);
+-
 +#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 +		if (SUSFS_IS_INODE_OPEN_REDIRECT(inode)) {
 +			char *spoofed_redirected_name = NULL;
@@ -1407,7 +1408,6 @@ index 7294b14811bc..b15b8a0cb618 100644
 +		if (SUSFS_IS_INODE_SUS_MAP(inode))
 +			return;
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
- 
  		dev = inode->i_sb->s_dev;
  		ino = inode->i_ino;
  		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
@@ -1417,7 +1417,7 @@ index 7294b14811bc..b15b8a0cb618 100644
  	}
  
  	start = vma->vm_start;
-@@ -1330,6 +1373,13 @@ static int show_smap(struct seq_file *m, void *v)
+@@ -1330,7 +1372,15 @@ static int show_smap(struct seq_file *m, void *v)
  	struct vm_area_struct *vma = v;
  	struct mem_size_stats mss = {};
  
@@ -1429,8 +1429,10 @@ index 7294b14811bc..b15b8a0cb618 100644
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 +
  	if (!vma_data_pages(vma))
++
  		goto show_pad;
  
+ 	smap_gather_stats(vma, &mss, 0);
 @@ -1390,7 +1440,14 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
  
  	vma_start = vma->vm_start;
@@ -2243,10 +2245,10 @@ index 83c5d3febbb8..6975513ebc36 100644
  	if (!error)
  		buf->f_flags = calculate_f_flags(path->mnt);
 diff --git a/fs/super.c b/fs/super.c
-index ba8c02f73e25..269c27a56519 100644
+index ba8c02f73e25..c84e79cec473 100644
 --- a/fs/super.c
 +++ b/fs/super.c
-@@ -37,11 +37,19 @@
+@@ -37,6 +37,9 @@
  #include <linux/lockdep.h>
  #include <linux/user_namespace.h>
  #include <linux/fs_context.h>
@@ -2256,16 +2258,18 @@ index ba8c02f73e25..269c27a56519 100644
  #include <uapi/linux/mount.h>
  #include "internal.h"
  
- #include <trace/hooks/fs.h>
+@@ -1194,6 +1197,11 @@ void emergency_thaw_all(void)
+ 
+ static DEFINE_IDA(unnamed_dev_ida);
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +extern bool susfs_is_current_ksu_domain(void);
 +extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
- static int thaw_super_locked(struct super_block *sb, enum freeze_holder who);
- 
- static LIST_HEAD(super_blocks);
+ /**
+  * get_anon_bdev - Allocate a block device for filesystems which don't have one.
+  * @p: Pointer to a dev_t.
 @@ -1209,6 +1217,22 @@ int get_anon_bdev(dev_t *p)
  {
  	int dev;
@@ -2450,7 +2454,7 @@ index f1e027581752..c185613f115b 100644
  		if (IS_ERR(page)) {
  			/* We might need to expand the stack to access it */
 diff --git a/security/selinux/avc.c b/security/selinux/avc.c
-index 29a9bf8543ce..97d1d25b4bc0 100644
+index 29a9bf8543ce..18456f388b10 100644
 --- a/security/selinux/avc.c
 +++ b/security/selinux/avc.c
 @@ -47,6 +47,12 @@
@@ -2466,7 +2470,7 @@ index 29a9bf8543ce..97d1d25b4bc0 100644
  struct avc_entry {
  	u32			ssid;
  	u32			tsid;
-@@ -711,11 +717,25 @@ static void avc_audit_post_callback(struct audit_buffer *ab, void *a)
+@@ -711,11 +717,24 @@ static void avc_audit_post_callback(struct audit_buffer *ab, void *a)
  
  	rc = security_sid_to_context(sad->tsid, &tcontext,
  				     &tcontext_len);
@@ -2485,7 +2489,7 @@ index 29a9bf8543ce..97d1d25b4bc0 100644
  		audit_log_format(ab, " tsid=%d", sad->tsid);
  	else
  		audit_log_format(ab, " tcontext=%s", tcontext);
- 
+-
 +#ifdef CONFIG_KSU_SUSFS
 +bypass_orig_flow:
 +#endif
@@ -2807,3 +2811,6 @@ index ead4ed5c3820..70cbd03a73b9 100644
  static int security_validtrans_handle_fail(struct selinux_policy *policy,
  					struct sidtab_entry *oentry,
  					struct sidtab_entry *nentry,
+
+-- 
+2.55.0
