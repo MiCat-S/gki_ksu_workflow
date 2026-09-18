@@ -62,7 +62,7 @@ def directory_digest(root):
     return digest.hexdigest()
 
 
-SOURCE = """#include <linux/security.h>
+SOURCE = "\n".join(sync.SUSFS_REVIEWED_INCLUDE_PREFIX) + """
 
 void susfs_update_sus_kstat(void)
 {
@@ -88,32 +88,80 @@ NAMESPACE_BASE = "base-namespace\n"
 APPLIED_NAMESPACE = NAMESPACE_BASE + """if (mnt->mnt_id < DEFAULT_KSU_MNT_ID)
 if (mnt->mnt_id < DEFAULT_KSU_MNT_ID)
 
-static struct mount *clone_mnt(struct mount *old, struct dentry *root, int flag)
+}
+EXPORT_SYMBOL_GPL(vfs_submount);
+
+static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+					int flag)
 {
+	struct super_block *sb = old->mnt.mnt_sb;
 	struct mount *mnt;
+	int err;
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 	bool is_mnt_ksu_unshared = false;
 
+	// - We will just stop checking for ksu process if /sdcard/Android is accessible,
+	//   for the sake of performance
 	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
+		// - If /sdcard/Android is still not accessible, we keep checking for mounts
+		//   mounted by ksu process
 		if (susfs_is_current_ksu_domain()) {
+			// - If it is unsharing, we re-use the old->mnt_id assign it for mnt->mnt_id directly
+			//   without going thru ida, but we need to set a bit VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT
+			//   on mnt->mnt.mnt_flags below, otherwise we find no other ways to identify if this
+			//   mnt->mnt_id is assigned without ida when it is being freed in mnt_free_id().
 			if (flag & CL_COPY_MNT_NS) {
 				mnt = susfs_alloc_unshare_ksu_vfsmnt(old->mnt_devname, old->mnt_id);
 				is_mnt_ksu_unshared = true;
 				goto bypass_orig_flow;
 			}
+			// else we just go assign fake mnt_id starting with DEFAULT_KSU_MNT_ID
 			mnt = susfs_alloc_non_unshare_ksu_vfsmnt(old->mnt_devname);
 			goto bypass_orig_flow;
 		}
 	}
 
+	// - We keep checking all processes and if old->mnt_id >= DEFAULT_KSU_MNT_ID,
+	//   go assign fake mnt_id starting with DEFAULT_KSU_MNT_ID
+	if (old->mnt_id >= DEFAULT_KSU_MNT_ID) {
+		mnt = susfs_alloc_non_unshare_ksu_vfsmnt(old->mnt_devname);
+		goto bypass_orig_flow;
+	}
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+
 	mnt = alloc_vfsmnt(old->mnt_devname);
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 bypass_orig_flow:
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 	if (!mnt)
 		return ERR_PTR(-ENOMEM);
+
+	if (flag & (CL_SLAVE | CL_PRIVATE | CL_SHARED_TO_SLAVE))
+		mnt->mnt_group_id = 0; /* not a peer of original */
+	else
+		mnt->mnt_group_id = old->mnt_group_id;
+
+	if ((flag & CL_MAKE_SHARED) && !mnt->mnt_group_id) {
+		err = mnt_alloc_group_id(mnt);
+		if (err)
+			goto out_free;
+	}
+
 	mnt->mnt.mnt_flags = old->mnt.mnt_flags;
 	mnt->mnt.mnt_flags &= ~(MNT_WRITE_HOLD|MNT_MARKED|MNT_INTERNAL);
+
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 	if (unlikely(is_mnt_ksu_unshared))
 		mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+
+	atomic_inc(&sb->s_active);
 	return mnt;
+
+ out_free:
+	mnt_free_id(mnt);
+	free_vfsmnt(mnt);
+	return ERR_PTR(err);
 }
 
 static void cleanup_mnt(struct mount *mnt)
@@ -132,11 +180,76 @@ def fixture_diff(path, before, after):
     return f"diff --git a/{path} b/{path}\n" + "".join(unified)
 
 
-PATCH = "".join((
-    fixture_diff("fs/namei.c", NAMEI_BASE, NAMEI_APPLIED),
-    fixture_diff("fs/namespace.c", NAMESPACE_BASE, APPLIED_NAMESPACE),
-    fixture_diff("fs/susfs.c", SUSFS_BASE, APPLIED_SUSFS),
-))
+def make_patch(namespace):
+    return "".join((
+        fixture_diff("fs/namei.c", NAMEI_BASE, NAMEI_APPLIED),
+        fixture_diff("fs/namespace.c", NAMESPACE_BASE, namespace),
+        fixture_diff("fs/susfs.c", SUSFS_BASE, APPLIED_SUSFS),
+    ))
+
+
+PATCH = make_patch(APPLIED_NAMESPACE)
+
+
+def clone_mnt_mutations():
+    flag_gate = (
+        "\tif (unlikely(is_mnt_ksu_unshared))\n"
+        "\t\tmnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;\n"
+    )
+    return {
+        "incorrect_initialization": APPLIED_NAMESPACE.replace(
+            "bool is_mnt_ksu_unshared = false;",
+            "bool is_mnt_ksu_unshared = true;"),
+        "missing_assignment": APPLIED_NAMESPACE.replace(
+            "\t\t\t\tis_mnt_ksu_unshared = true;\n", ""),
+        "assignment_before_allocation": APPLIED_NAMESPACE.replace(
+            "\t\t\t\tmnt = susfs_alloc_unshare_ksu_vfsmnt(old->mnt_devname, old->mnt_id);\n"
+            "\t\t\t\tis_mnt_ksu_unshared = true;\n",
+            "\t\t\t\tis_mnt_ksu_unshared = true;\n"
+            "\t\t\t\tmnt = susfs_alloc_unshare_ksu_vfsmnt(old->mnt_devname, old->mnt_id);\n"),
+        "declaration_after_allocation": APPLIED_NAMESPACE.replace(
+            "\tbool is_mnt_ksu_unshared = false;\n", "").replace(
+            "\t\t\t\tis_mnt_ksu_unshared = true;\n",
+            "\t\t\t\tis_mnt_ksu_unshared = true;\n"
+            "\t\t\t\tbool is_mnt_ksu_unshared = false;\n"),
+        "incorrect_flag_gate": APPLIED_NAMESPACE.replace(
+            "\tif (unlikely(is_mnt_ksu_unshared))\n",
+            "\tif (flag & CL_COPY_MNT_NS)\n"),
+        "single_line_old_race": APPLIED_NAMESPACE.replace(
+            flag_gate,
+            "\tif (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {\n"
+            + flag_gate + "\t}\n"),
+        "multiline_old_race": APPLIED_NAMESPACE.replace(
+            flag_gate,
+            "\tif (static_branch_unlikely(\n"
+            "\t\t&susfs_is_sdcard_android_data_not_decrypted)) {\n"
+            + flag_gate + "\t}\n"),
+        "unreachable_flag_write": APPLIED_NAMESPACE.replace(
+            flag_gate, "\tif (0)\n" + flag_gate),
+        "commented_out_flag_gate": APPLIED_NAMESPACE.replace(
+            flag_gate, "/*\n" + flag_gate + "*/\n"),
+        "disabled_flag_gate": APPLIED_NAMESPACE.replace(
+            flag_gate, "#if 0\n" + flag_gate + "#endif\n"),
+        "disabled_clone_mnt": APPLIED_NAMESPACE.replace(
+            "static struct mount *clone_mnt",
+            "#if 0\nstatic struct mount *clone_mnt", 1).replace(
+            "\nstatic void cleanup_mnt", "\n#endif\nstatic void cleanup_mnt", 1),
+        "commented_clone_mnt": APPLIED_NAMESPACE.replace(
+            "static struct mount *clone_mnt",
+            "/*\nstatic struct mount *clone_mnt", 1).replace(
+            "\nstatic void cleanup_mnt", "\n*/\nstatic void cleanup_mnt", 1),
+    }
+
+
+def security_source_mutations():
+    header = "#include <linux/security.h>"
+    return {
+        "missing_security_header": SOURCE.replace(header + "\n", "", 1),
+        "commented_security_header": SOURCE.replace(
+            header, "/*\n" + header + "\n*/", 1),
+        "disabled_security_header": SOURCE.replace(
+            header, "#if 0\n" + header + "\n#endif", 1),
+    }
 
 
 class SyncFixture:
@@ -207,6 +320,41 @@ class SyncFixture:
         }
         self.baseline_manifest.write_text(json.dumps(data, indent=2) + "\n")
 
+    def set_workflow_patch(self, patch):
+        (self.workflow / self.input_path).write_text(patch)
+        run(["git", "-C", self.workflow, "add", self.input_path])
+        run(["git", "-C", self.workflow, "-c", "user.name=Test",
+             "-c", "user.email=test@example.invalid", "commit", "-qm",
+             "update fixture patch"])
+        self.workflow_commit = run(
+            ["git", "-C", self.workflow, "rev-parse", "HEAD"]
+        ).decode().strip()
+        self.data["reference_workflow"] = self.workflow_commit
+        self.data["profiles"][0]["input_sha256"] = hashlib.sha256(
+            patch.encode()).hexdigest()
+        self.write_config()
+
+    def force_converter_patch(self, patch):
+        forced = self.converter.parent / "forced.patch"
+        forced.write_text(patch)
+        self.converter.write_text(
+            "#!/bin/sh\nset -eu\ncp \"$(dirname \"$0\")/forced.patch\" \"$2\"\n")
+
+    def set_susfs_source(self, source):
+        source_path = self.susfs / self.data["source_path"]
+        source_path.write_text(source)
+        run(["git", "-C", self.susfs, "add", self.data["source_path"]])
+        run(["git", "-C", self.susfs, "-c", "user.name=Test",
+             "-c", "user.email=test@example.invalid", "commit", "-qm",
+             "update fixture source"])
+        self.susfs_commit = run(
+            ["git", "-C", self.susfs, "rev-parse", "HEAD"]
+        ).decode().strip()
+        profile = self.data["profiles"][0]
+        profile["susfs_commit"] = self.susfs_commit
+        profile["source_sha256"] = hashlib.sha256(source.encode()).hexdigest()
+        self.write_config()
+
     def generate(self, output):
         return sync.generate(self.config, self.workflow, self.susfs, self.cache,
                              self.converter, output)
@@ -220,6 +368,13 @@ class SyncTests(unittest.TestCase):
 
     def tearDown(self):
         self.temporary.cleanup()
+
+    def assert_generation_rejected_without_batch(self, fixture, output_name):
+        output = fixture.root / output_name
+        with self.assertRaises(sync.SyncError):
+            fixture.generate(output)
+        self.assertFalse(output.exists())
+        self.assertFalse(list(fixture.root.glob(f".{output_name}.staging-*")))
 
     def test_reproducible_generation_preserves_fixes_and_inputs(self):
         (self.fixture.workflow / "notes").write_text("dirty workflow\n")
@@ -426,57 +581,48 @@ class SyncTests(unittest.TestCase):
                 sync.validate_fix_coverage(SOURCE, PATCH, broken)
 
     def test_applied_clone_mnt_race_regressions_are_rejected(self):
-        mutations = {
-            "missing_security_header": (APPLIED_NAMESPACE, SUSFS_BASE),
-            "incorrect_initialization": (
-                APPLIED_NAMESPACE.replace(
-                    "bool is_mnt_ksu_unshared = false;",
-                    "bool is_mnt_ksu_unshared = true;"),
-                APPLIED_SUSFS,
-            ),
-            "missing_assignment": (
-                APPLIED_NAMESPACE.replace(
-                    "\t\t\t\tis_mnt_ksu_unshared = true;\n", ""),
-                APPLIED_SUSFS,
-            ),
-            "assignment_before_allocation": (
-                APPLIED_NAMESPACE.replace(
-                    "\t\t\t\tmnt = susfs_alloc_unshare_ksu_vfsmnt(old->mnt_devname, old->mnt_id);\n"
-                    "\t\t\t\tis_mnt_ksu_unshared = true;\n",
-                    "\t\t\t\tis_mnt_ksu_unshared = true;\n"
-                    "\t\t\t\tmnt = susfs_alloc_unshare_ksu_vfsmnt(old->mnt_devname, old->mnt_id);\n"),
-                APPLIED_SUSFS,
-            ),
-            "declaration_after_allocation": (
-                APPLIED_NAMESPACE.replace(
-                    "\tbool is_mnt_ksu_unshared = false;\n", "").replace(
-                    "\t\t\t\tis_mnt_ksu_unshared = true;\n",
-                    "\t\t\t\tis_mnt_ksu_unshared = true;\n"
-                    "\t\t\t\tbool is_mnt_ksu_unshared = false;\n"),
-                APPLIED_SUSFS,
-            ),
-            "incorrect_flag_gate": (
-                APPLIED_NAMESPACE.replace(
-                    "\tif (unlikely(is_mnt_ksu_unshared))\n",
-                    "\tif (flag & CL_COPY_MNT_NS)\n"),
-                APPLIED_SUSFS,
-            ),
-            "all_markers_but_racy_static_key_recheck": (
-                APPLIED_NAMESPACE.replace(
-                    "\tif (unlikely(is_mnt_ksu_unshared))\n"
-                    "\t\tmnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;\n",
-                    "\tif (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {\n"
-                    "\t\tif (unlikely(is_mnt_ksu_unshared))\n"
-                    "\t\t\tmnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;\n"
-                    "\t}\n"),
-                APPLIED_SUSFS,
-            ),
-        }
-        sync.validate_applied_source(
-            APPLIED_NAMESPACE, APPLIED_SUSFS, "positive fixture")
-        for name, (namespace, susfs) in mutations.items():
+        sync.validate_applied_source(APPLIED_NAMESPACE, SOURCE, "positive fixture")
+        for name, namespace in clone_mnt_mutations().items():
             with self.subTest(name=name), self.assertRaises(sync.SyncError):
-                sync.validate_applied_source(namespace, susfs, name)
+                sync.validate_applied_source(namespace, SOURCE, name)
+        for name, source in security_source_mutations().items():
+            with self.subTest(name=name), self.assertRaises(sync.SyncError):
+                sync.validate_applied_source(APPLIED_NAMESPACE, source, name)
+
+    def test_clone_mnt_regressions_fail_closed_in_50_and_51_replay(self):
+        generator_mutations = {
+            name: clone_mnt_mutations()[name]
+            for name in (
+                "multiline_old_race",
+                "unreachable_flag_write",
+                "commented_out_flag_gate",
+                "disabled_flag_gate",
+                "disabled_clone_mnt",
+                "commented_clone_mnt",
+            )
+        }
+        for name, namespace in generator_mutations.items():
+            broken_patch = make_patch(namespace)
+            for patch_form in ("50", "51"):
+                with self.subTest(name=name, patch_form=patch_form):
+                    case_root = self.root / f"generator-{name}-{patch_form}"
+                    fixture = SyncFixture(case_root)
+                    if patch_form == "50":
+                        fixture.set_workflow_patch(broken_patch)
+                        fixture.force_converter_patch(PATCH)
+                    else:
+                        fixture.force_converter_patch(broken_patch)
+                    self.assert_generation_rejected_without_batch(
+                        fixture, "rejected-candidate")
+
+    def test_security_header_regressions_fail_closed_in_source_replay(self):
+        for name, source in security_source_mutations().items():
+            with self.subTest(name=name):
+                case_root = self.root / f"generator-{name}"
+                fixture = SyncFixture(case_root)
+                fixture.set_susfs_source(source)
+                self.assert_generation_rejected_without_batch(
+                    fixture, "rejected-candidate")
 
     def test_reviewed_sync_inputs_match_the_production_stack(self):
         config_path = ROOT / ".github/config/susfs-sync.json"

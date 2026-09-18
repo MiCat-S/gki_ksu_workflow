@@ -38,6 +38,116 @@ PATCH_FIXES = {
     "restore_nameidata_before_putname": ("nd->name = old_name;", 1),
 }
 
+SUSFS_REVIEWED_INCLUDE_PREFIX = tuple("""#include <linux/version.h>
+#include <linux/cred.h>
+#include <linux/fs.h>
+#include <linux/slab.h>
+#include <linux/seq_file.h>
+#include <linux/printk.h>
+#include <linux/namei.h>
+#include <linux/list.h>
+#include <linux/init_task.h>
+#include <linux/mutex.h>
+#include <linux/seqlock.h>
+#include <linux/stat.h>
+#include <linux/uaccess.h>
+#include <linux/version.h>
+#include <linux/fdtable.h>
+#include <linux/statfs.h>
+#include <linux/random.h>
+#include <linux/kthread.h>
+#include <linux/delay.h>
+#include <linux/workqueue.h>
+#include <linux/fsnotify_backend.h>
+#include <linux/jump_label.h>
+#include <linux/security.h>
+#include <linux/susfs.h>
+#include "fuse/fuse_i.h"
+#include "mount.h"
+""".splitlines())
+
+CLONE_MNT_REVIEWED_PRELUDE = "}\nEXPORT_SYMBOL_GPL(vfs_submount);\n\n"
+
+CLONE_MNT_REVIEWED_PREFIX = tuple(line.strip() for line in """
+static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+int flag)
+{
+struct super_block *sb = old->mnt.mnt_sb;
+struct mount *mnt;
+int err;
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+bool is_mnt_ksu_unshared = false;
+
+// - We will just stop checking for ksu process if /sdcard/Android is accessible,
+//   for the sake of performance
+if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
+// - If /sdcard/Android is still not accessible, we keep checking for mounts
+//   mounted by ksu process
+if (susfs_is_current_ksu_domain()) {
+// - If it is unsharing, we re-use the old->mnt_id assign it for mnt->mnt_id directly
+//   without going thru ida, but we need to set a bit VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT
+//   on mnt->mnt.mnt_flags below, otherwise we find no other ways to identify if this
+//   mnt->mnt_id is assigned without ida when it is being freed in mnt_free_id().
+if (flag & CL_COPY_MNT_NS) {
+mnt = susfs_alloc_unshare_ksu_vfsmnt(old->mnt_devname, old->mnt_id);
+is_mnt_ksu_unshared = true;
+goto bypass_orig_flow;
+}
+// else we just go assign fake mnt_id starting with DEFAULT_KSU_MNT_ID
+mnt = susfs_alloc_non_unshare_ksu_vfsmnt(old->mnt_devname);
+goto bypass_orig_flow;
+}
+}
+
+// - We keep checking all processes and if old->mnt_id >= DEFAULT_KSU_MNT_ID,
+//   go assign fake mnt_id starting with DEFAULT_KSU_MNT_ID
+if (old->mnt_id >= DEFAULT_KSU_MNT_ID) {
+mnt = susfs_alloc_non_unshare_ksu_vfsmnt(old->mnt_devname);
+goto bypass_orig_flow;
+}
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+
+mnt = alloc_vfsmnt(old->mnt_devname);
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+bypass_orig_flow:
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+if (!mnt)
+return ERR_PTR(-ENOMEM);
+
+if (flag & (CL_SLAVE | CL_PRIVATE | CL_SHARED_TO_SLAVE))
+mnt->mnt_group_id = 0; /* not a peer of original */
+else
+mnt->mnt_group_id = old->mnt_group_id;
+
+if ((flag & CL_MAKE_SHARED) && !mnt->mnt_group_id) {
+err = mnt_alloc_group_id(mnt);
+if (err)
+goto out_free;
+}
+
+mnt->mnt.mnt_flags = old->mnt.mnt_flags;
+mnt->mnt.mnt_flags &= ~(MNT_WRITE_HOLD|MNT_MARKED|MNT_INTERNAL);
+
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+if (unlikely(is_mnt_ksu_unshared))
+mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+
+atomic_inc(&sb->s_active);""".strip("\n").splitlines())
+
+CLONE_MNT_REVIEWED_SUFFIX = """
+	return mnt;
+
+ out_free:
+	mnt_free_id(mnt);
+	free_vfsmnt(mnt);
+	return ERR_PTR(err);
+}""" + "\n\n"
+
+STATIC_KEY_CALL_RE = re.compile(
+    r"\bstatic_branch_unlikely\s*\(\s*"
+    r"&susfs_is_sdcard_android_data_not_decrypted\s*\)", re.MULTILINE)
+
 
 class SyncError(RuntimeError):
     pass
@@ -161,6 +271,10 @@ def validate_fix_coverage(source_text, patch_50, patch_51):
 
 
 def validate_applied_source(namespace_text, susfs_text, label):
+    susfs_lines = tuple(line.strip() for line in susfs_text.splitlines())
+    if susfs_lines[:len(SUSFS_REVIEWED_INCLUDE_PREFIX)] != SUSFS_REVIEWED_INCLUDE_PREFIX:
+        raise SyncError(
+            f"{label}: fs/susfs.c reviewed include prefix is not active at file start")
     security_headers = re.findall(
         r"(?m)^#include <linux/security\.h>[ \t]*$", susfs_text)
     if len(security_headers) != 1:
@@ -177,6 +291,13 @@ def validate_applied_source(namespace_text, susfs_text, label):
         raise SyncError(f"{label}: clone_mnt boundary before cleanup_mnt is missing")
     end = starts[0].end() + end_match.start()
     clone_mnt = namespace_text[start:end]
+    if not namespace_text[:start].endswith(CLONE_MNT_REVIEWED_PRELUDE):
+        raise SyncError(f"{label}: clone_mnt reviewed live-code prelude changed")
+    clone_lines = tuple(line.strip() for line in clone_mnt.splitlines())
+    if clone_lines[:len(CLONE_MNT_REVIEWED_PREFIX)] != CLONE_MNT_REVIEWED_PREFIX:
+        raise SyncError(f"{label}: clone_mnt reviewed live-code prefix changed")
+    if not clone_mnt.endswith(CLONE_MNT_REVIEWED_SUFFIX):
+        raise SyncError(f"{label}: clone_mnt reviewed live-code suffix changed")
 
     declaration_matches = list(re.finditer(
         r"(?m)^[ \t]*bool is_mnt_ksu_unshared = false;[ \t]*$", clone_mnt)
@@ -221,10 +342,10 @@ def validate_applied_source(namespace_text, susfs_text, label):
             not declaration_matches[0].start() < allocation_matches[0].start() <
             bypass.start() < flags_reset < flag_matches[0].start()):
         raise SyncError(f"{label}: clone_mnt allocation/flag control-flow order changed")
-    after_allocation = clone_mnt[bypass.end():flag_matches[0].start()]
-    if "static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)" in after_allocation:
+    static_key_calls = STATIC_KEY_CALL_RE.findall(clone_mnt)
+    if len(static_key_calls) != 1:
         raise SyncError(
-            f"{label}: clone_mnt rechecks the static key after choosing the allocation path")
+            f"{label}: clone_mnt must have exactly one reviewed static-key decision")
 
     return {
         "security_header": True,
